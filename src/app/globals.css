@@ -1,0 +1,47 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* ── Base ─────────────────────────────────────────────────────────────────
+   Dark-mode-first: the body paints the deep slate "aurora" backdrop every
+   glass surface blurs against. The staff workspace (still on the legacy light
+   look until its glass pass) paints its own opaque background over this. */
+
+body {
+  min-height: 100vh;
+  background-color: #060b16;
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(16, 185, 129, 0.13), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 0%, rgba(139, 92, 246, 0.16), transparent 55%),
+    radial-gradient(44rem 34rem at 50% 115%, rgba(14, 116, 144, 0.18), transparent 60%);
+  background-attachment: fixed;
+  color: #e2e8f0;
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Legacy type helpers (the ported staff views still use these) ────────── */
+
+.ao-disp {
+  font-family: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
+}
+.ao-mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+.ao-body {
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+.ao-body input,
+.ao-body select,
+.ao-body textarea {
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+.ao-body :focus-visible {
+  outline: 2px solid #0c5e63;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

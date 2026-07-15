@@ -1,0 +1,168 @@
+// Absence Ops — relational schema.
+//
+// Field names on Case deliberately mirror the pure rules engine's entry shape
+// (src/lib/engine.js): rows read from Prisma are engine-ready after the thin
+// mapper in src/lib/db.ts, so the DCM logic, 90-day chains and labor-law caps
+// run unchanged on server data.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: the connection URL lives in prisma.config.ts (Migrate/CLI) and in
+// the PrismaPg driver adapter (runtime) — both read DATABASE_URL from .env.
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SuperAdmin
+  HRBusinessPartner
+  OperationsLead
+  ProjectManager
+  WFM
+  Agent
+}
+
+// Matches the engine's stage strings exactly — Prisma returns enum values as
+// plain strings, so no translation layer is needed.
+enum CaseStage {
+  review
+  active
+  dismissed
+}
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  role       Role
+  passHash   String // bcrypt
+  mustChange Boolean  @default(true) // seeded/reset accounts must set their own password
+  // Links an Agent login to their case history. Cases carry empId/email pairs;
+  // an agent sees (and may acknowledge) only cases matching either identifier.
+  empId      String?  @unique
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model Case {
+  id      String @id @default(cuid())
+  account String
+  lob     String @default("")
+
+  // Calendar day, YYYY-MM-DD — a string on purpose. The engine does exact
+  // calendar-day arithmetic (see src/lib/dates.js); storing a timestamp here
+  // would reintroduce the timezone drift that arithmetic was built to kill.
+  date String
+
+  // Agent identity: either identifier may be blank (RTA rows have IDs but no
+  // emails; manual entries the reverse). The engine matches on empId OR email.
+  email     String @default("")
+  empId     String @default("")
+  agentName String @default("")
+
+  tl           String @default("") // logged by
+  executorName String @default("") // RTA sheet's executor column
+  shiftStart   String @default("")
+  shiftEnd     String @default("")
+
+  violation String
+  sickNote  Boolean @default(false)
+
+  // Lost-time components, minutes. missingMin is net of compensation — it is
+  // what analytics count.
+  tardyMin   Int @default(0)
+  earlyMin   Int @default(0)
+  compMin    Int @default(0)
+  missingMin Int @default(0)
+
+  // The verdict. Provisional at logging; finalized by engine.decideCases at
+  // escalation. deductionApplied is the labor-law-capped figure and is
+  // re-settled across the ledger whenever history changes.
+  occurrence       Int?
+  action           String  @default("")
+  executor         String  @default("")
+  severity         String? // Minor | Moderate | Serious | Zero Tolerance | null for leave
+  disciplinary     Boolean @default(false)
+  deductionDays    Int     @default(0)
+  deductionApplied Int     @default(0)
+  reclassifiedFrom String  @default("")
+
+  notes String @default("")
+
+  // Pipeline
+  stage        CaseStage @default(review)
+  assignee     String    @default("")
+  notified     Boolean   @default(false)
+  opsConfirmed Boolean   @default(false)
+  hrNeeded     Boolean   @default(false)
+  hrConfirmed  Boolean   @default(false)
+  hrRef        String    @default("")
+  actionDate   String    @default("")
+
+  // Per-case activity timeline shown on the card ({at, by, type, text}[]).
+  // System-of-record events additionally land in AuditLog.
+  activity Json @default("[]")
+
+  // ── Digital acknowledgement ──────────────────────────────────────────────
+  // Set true when HR/OPS finalizes a disciplinary case; the agent portal
+  // surfaces it until the agent signs. agentAcknowledgedAt is the stamp —
+  // "pending" means requiresAcknowledgement && agentAcknowledgedAt == null.
+  requiresAcknowledgement Boolean   @default(false)
+  agentAcknowledgedAt     DateTime?
+  agentSignature          String    @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([empId, violation, date])
+  @@index([email, violation, date])
+  @@index([stage])
+  @@index([requiresAcknowledgement, agentAcknowledgedAt])
+}
+
+// The editable Disciplinary Consequences Matrix. Seeded with the 35-violation
+// default; only SuperAdmin may write (enforced in the API layer).
+model DcmRule {
+  id       String @id // stable slugs: "late", "ncns", "csat", …
+  name     String @unique
+  severity String
+  a1       String @default("")
+  e1       String @default("")
+  a2       String @default("")
+  e2       String @default("")
+  a3       String @default("")
+  e3       String @default("")
+  sort     Int    @default(0)
+}
+
+// Singleton row (id = 1): the small editable lists that aren't worth tables.
+model AppConfig {
+  id       Int  @id @default(1)
+  accounts Json // ["Hertz", "Lenovo", "Beko"]
+  tls      Json // team-lead display names
+}
+
+// Append-only system audit. The API exposes create and read — never update or
+// delete (the sole exception is the SuperAdmin factory reset, which wipes the
+// whole database). actor is SetNull so deleting a user never erases history.
+model AuditLog {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String
+  actorRole String
+  action    String // CASE_CREATED | CASE_DECIDED | CASE_UPDATED | CASE_DELETED | CASE_ACKNOWLEDGED | RTA_IMPORTED | DCM_UPDATED | CONFIG_UPDATED | USER_CREATED | USER_UPDATED | USER_DELETED | USER_PASSWORD_CHANGED | FACTORY_RESET
+  caseId    String?
+  summary   String
+  meta      Json     @default("{}")
+
+  @@index([at])
+  @@index([caseId])
+  @@index([action])
+}

@@ -1,4 +1,11 @@
 node_modules
 dist
+.next
+next-env.d.ts
+*.tsbuildinfo
 .DS_Store
 *.local
+
+# secrets & local database — never commit these
+.env
+.pgdata

@@ -1,61 +1,65 @@
-/* Tab F½ — user provisioning. SuperAdmin only.
+/* User provisioning — SuperAdmin only, server-backed.
 
    Creating a user issues the shared default password and flags the account to
-   change it at first login; resetting does the same. The last SuperAdmin can't
-   be deleted or demoted — someone has to hold the keys. */
+   change it at first login; resetting does the same. Server-side guards keep
+   the last SuperAdmin undeletable and un-demotable; errors from those guards
+   surface inline here. Agent accounts need an employee ID so the portal can
+   find their case history. */
 
 import { useState } from "react";
 import { UserPlus, KeyRound, Trash2, ShieldCheck } from "lucide-react";
 import { Card, Field, TInput, TSelect, BtnPrimary, Muted, Pill } from "./ui/index.jsx";
 import { P } from "../lib/tokens.js";
 import { fmtStamp } from "../lib/format.js";
-import { ROLES, ROLE_LABEL, DEFAULT_PASSWORD, makeUser, resetPassword } from "../lib/auth.js";
+import { ROLES, ROLE_LABEL, DEFAULT_PASSWORD } from "../lib/auth.js";
 
-export default function UserManagement({ users, me, onChange }) {
+export default function UserManagement({ users, me, onCreate, onReset, onRole, onDelete }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("ProjectManager");
+  const [empId, setEmpId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const superAdmins = users.filter((u) => u.role === "SuperAdmin");
-  const lastSuper = (u) => u.role === "SuperAdmin" && superAdmins.length === 1;
+  const say = (fn) => async (...args) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await fn(...args);
+    } catch (err) {
+      setError(err.message || "The server rejected that.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const add = () => {
-    const em = email.trim().toLowerCase();
-    if (!name.trim()) return setError("A name is required.");
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return setError("That doesn't look like an email address.");
-    if (users.some((u) => u.email === em)) return setError("A user with that email already exists.");
-    onChange([...users, makeUser({ name: name.trim(), email: em, role })]);
-    setNotice(`${name.trim()} created — first login is ${em} / ${DEFAULT_PASSWORD}.`);
+  const add = say(async () => {
+    await onCreate({ name: name.trim(), email: email.trim(), role, empId: empId.trim() });
+    setNotice(`${name.trim()} created — first login is ${email.trim().toLowerCase()} / ${DEFAULT_PASSWORD}.`);
     setName("");
     setEmail("");
-    setError("");
-  };
+    setEmpId("");
+  });
 
-  const reset = (u) => {
+  const reset = say(async (u) => {
     if (!window.confirm(`Reset ${u.name}'s password to the default? They'll be forced to change it at next login.`)) return;
-    onChange(users.map((x) => (x.id === u.id ? resetPassword(x) : x)));
+    await onReset(u.id);
     setNotice(`${u.name}'s password reset to ${DEFAULT_PASSWORD}.`);
-  };
+  });
 
-  const setUserRole = (u, nextRole) => {
-    if (lastSuper(u) && nextRole !== "SuperAdmin") {
-      setNotice("");
-      setError(`${u.name} is the only Super Admin — promote someone else first.`);
-      return;
-    }
-    setError("");
-    onChange(users.map((x) => (x.id === u.id ? { ...x, role: nextRole } : x)));
-  };
+  const changeRole = say(async (u, nextRole) => {
+    await onRole(u.id, nextRole);
+    setNotice(`${u.name} is now ${ROLE_LABEL[nextRole]}.`);
+  });
 
-  const remove = (u) => {
-    if (u.id === me.id) return setError("You can't delete the account you're signed in with.");
-    if (lastSuper(u)) return setError(`${u.name} is the only Super Admin — promote someone else first.`);
-    if (!window.confirm(`Delete ${u.name} (${u.email})? Their past actions stay in the case logs.`)) return;
-    setError("");
-    onChange(users.filter((x) => x.id !== u.id));
-  };
+  const remove = say(async (u) => {
+    if (u.id === me.id) throw new Error("You can't delete the account you're signed in with.");
+    if (!window.confirm(`Delete ${u.name} (${u.email})? Their past actions stay in the audit log.`)) return;
+    await onDelete(u.id);
+    setNotice(`${u.name} deleted.`);
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
@@ -76,20 +80,21 @@ export default function UserManagement({ users, me, onChange }) {
               ))}
             </TSelect>
           </Field>
+          <Field label={role === "Agent" ? "Employee ID (required for agents)" : "Employee ID (optional)"}>
+            <TInput value={empId} onChange={(e) => { setEmpId(e.target.value); setError(""); }} placeholder="EG0000" />
+          </Field>
           {error && (
             <div style={{ fontSize: 12.5, color: P.brick }} role="alert">
               {error}
             </div>
           )}
-          {notice && !error && (
-            <div style={{ fontSize: 12.5, color: P.green }}>{notice}</div>
-          )}
-          <BtnPrimary icon={UserPlus} onClick={add}>
+          {notice && !error && <div style={{ fontSize: 12.5, color: P.green }}>{notice}</div>}
+          <BtnPrimary icon={UserPlus} onClick={add} disabled={busy}>
             Create user
           </BtnPrimary>
           <Muted>
             New accounts start with the default password <span className="ao-mono">{DEFAULT_PASSWORD}</span> and must
-            change it on first login.
+            change it on first login. Agents sign into the self-service portal; staff roles into this workspace.
           </Muted>
         </div>
       </Card>
@@ -100,7 +105,7 @@ export default function UserManagement({ users, me, onChange }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
-                  {["User", "Role", "Status", "Created", ""].map((h) => (
+                  {["User", "Role", "Emp ID", "Status", "Created", ""].map((h) => (
                     <th key={h} className="ao-disp uppercase tracking-wider text-left" style={{ fontSize: 10, color: P.sub, padding: "6px 8px" }}>
                       {h}
                     </th>
@@ -127,9 +132,9 @@ export default function UserManagement({ users, me, onChange }) {
                     <td style={{ padding: "8px" }}>
                       <TSelect
                         value={u.role}
-                        onChange={(e) => setUserRole(u, e.target.value)}
-                        disabled={lastSuper(u)}
-                        style={{ fontSize: 12, padding: "4px 6px", width: 170, opacity: lastSuper(u) ? 0.6 : 1 }}
+                        onChange={(e) => changeRole(u, e.target.value)}
+                        disabled={busy}
+                        style={{ fontSize: 12, padding: "4px 6px", width: 170 }}
                       >
                         {ROLES.map((r) => (
                           <option key={r} value={r}>
@@ -138,6 +143,7 @@ export default function UserManagement({ users, me, onChange }) {
                         ))}
                       </TSelect>
                     </td>
+                    <td className="ao-mono" style={{ padding: "8px", fontSize: 12, color: P.inkSoft }}>{u.empId || "—"}</td>
                     <td style={{ padding: "8px" }}>
                       {u.mustChange ? <Pill color={P.amber}>Default password</Pill> : <Pill color={P.green}>Active</Pill>}
                     </td>
@@ -147,6 +153,7 @@ export default function UserManagement({ users, me, onChange }) {
                     <td style={{ padding: "8px", whiteSpace: "nowrap" }}>
                       <button
                         onClick={() => reset(u)}
+                        disabled={busy}
                         title="Reset password to default"
                         className="inline-flex items-center gap-1"
                         style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: P.petrol, marginRight: 10 }}
@@ -156,6 +163,7 @@ export default function UserManagement({ users, me, onChange }) {
                       </button>
                       <button
                         onClick={() => remove(u)}
+                        disabled={busy}
                         title="Delete user"
                         className="inline-flex items-center gap-1"
                         style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: P.sub }}

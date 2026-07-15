@@ -170,7 +170,8 @@ console.log("\n── Escalation flags ──");
 const { agentMatches, agentKeyOf } = await import(`${LIB}/identity.js`);
 const { applyCompensation } = await import(`${LIB}/compensation.js`);
 const { parseCsv, parseDur, parseRtaDate, mapHeaders, assessRta, buildEntries, TEMPLATE_CSV } = await import(`${LIB}/rta.js`);
-const { makeUser, verifyPassword, setPassword, resetPassword, DEFAULT_PASSWORD } = await import(`${LIB}/auth.js`);
+const { can, TABS_FOR, ROLES, DEFAULT_PASSWORD } = await import(`${LIB}/auth.js`);
+const bcrypt = (await import("bcryptjs")).default;
 
 console.log("\n── Agent identity (empId OR email) ──");
 eq("email matches email", agentMatches({ email: "A@x", empId: "" }, { email: "a@x" }), true);
@@ -253,15 +254,18 @@ eq("escaped quote survives", parseCsv('a,"say ""hi""",c')[0], ["a", 'say "hi"', 
   eq("dismiss keeps stage + verdict untouched", [out[0].stage, out[0].occurrence], ["dismissed", 1]);
 }
 
-console.log("\n── Mock auth ──");
+console.log("\n── RBAC + password hashing ──");
 {
-  const u = makeUser({ name: "T", email: "T@X.com", role: "WFM" });
-  eq("email normalised", u.email, "t@x.com");
-  eq("default password verifies, wrong doesn't", [verifyPassword(u, DEFAULT_PASSWORD), verifyPassword(u, "nope")], [true, false]);
-  const changed = setPassword(u, "S3cret!!");
-  eq("changed password verifies, old doesn't, flag cleared", [verifyPassword(changed, "S3cret!!"), verifyPassword(changed, DEFAULT_PASSWORD), changed.mustChange], [true, false, false]);
-  const back = resetPassword(changed);
-  eq("reset restores default + mustChange", [verifyPassword(back, DEFAULT_PASSWORD), back.mustChange], [true, true]);
+  eq("six roles incl. Agent", [ROLES.length, ROLES.includes("Agent")], [6, true]);
+  eq("agents have no workspace tabs", TABS_FOR.Agent.length, 0);
+  eq("WFM sees only the RTA tab", TABS_FOR.WFM, ["rta"]);
+  eq("only agents may acknowledge", [can({ role: "Agent" }, "acknowledge"), can({ role: "SuperAdmin" }, "acknowledge")], [true, false]);
+  eq("only SuperAdmin administers", [can({ role: "SuperAdmin" }, "admin"), can({ role: "HRBusinessPartner" }, "admin")], [true, false]);
+  eq("HR executes, OPS doesn't", [can({ role: "HRBusinessPartner" }, "hr"), can({ role: "OperationsLead" }, "hr")], [true, false]);
+  eq("no user -> no permission", can(null, "triage"), false);
+
+  const hash = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
+  eq("bcrypt roundtrip", [bcrypt.compareSync(DEFAULT_PASSWORD, hash), bcrypt.compareSync("nope", hash)], [true, false]);
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

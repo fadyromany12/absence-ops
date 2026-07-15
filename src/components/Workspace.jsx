@@ -1,4 +1,15 @@
+"use client";
+
+/* The staff workspace — the tabbed app, now server-backed.
+
+   Ported from the localStorage-era App.jsx: same views, same role gates, but
+   every mutation goes through the API (which re-settles deduction caps and
+   audits), and the state shown is always the server's post-write truth.
+   The glass restyle of these inner views rides on the shared kit later; the
+   workspace keeps its proven light look for now, painted over the dark shell. */
+
 import { useEffect, useMemo, useState } from "react";
+import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   ClipboardPlus,
@@ -16,36 +27,27 @@ import {
   CircleCheck,
   CircleAlert,
   LogOut,
+  X,
 } from "lucide-react";
 
-import { useLocalStorage } from "./hooks/useLocalStorage.js";
-import { P, accColor } from "./lib/tokens.js";
-import { STORAGE_KEY, SESSION_KEY } from "./lib/constants.js";
-import { normalize } from "./lib/storage.js";
-import { settleDeductions } from "./lib/deductions.js";
-import { todayStr, daysAgo, monthOf } from "./lib/dates.js";
-import { fmtMin } from "./lib/format.js";
-import { statusOf, computeEscalations, countsForDiscipline, decideCases } from "./lib/engine.js";
-import { buildSamples } from "./lib/samples.js";
-import { downloadCsv } from "./lib/csv.js";
-import { TABS_FOR, ROLE_LABEL, can, makeToken, setPassword } from "./lib/auth.js";
+import { useServerData } from "../hooks/useServerData.js";
+import { P, accColor } from "../lib/tokens.js";
+import { todayStr, daysAgo, monthOf } from "../lib/dates.js";
+import { fmtMin } from "../lib/format.js";
+import { statusOf, computeEscalations, countsForDiscipline } from "../lib/engine.js";
+import { downloadCsv } from "../lib/csv.js";
+import { TABS_FOR, ROLE_LABEL, can } from "../lib/auth.js";
 
-import { TInput, BtnPrimary, BtnGhost, SectionTitle, Muted } from "./components/ui/index.jsx";
-import { LoginView, ChangePasswordView } from "./components/LoginView.jsx";
-import LogForm from "./components/LogForm.jsx";
-import EntryCard from "./components/EntryCard.jsx";
-import Dashboard from "./components/Dashboard.jsx";
-import TriageGate from "./components/TriageGate.jsx";
-import RtaUploader from "./components/RtaUploader.jsx";
-import AgentProfiles from "./components/AgentProfiles.jsx";
-import DcmEditor from "./components/DcmEditor.jsx";
-import UserManagement from "./components/UserManagement.jsx";
-import SettingsView from "./components/SettingsView.jsx";
-
-/* Seeded once at module load: the state a browser gets before anything is
-   stored, and the state a hard reset returns to. normalize({}) seeds the
-   default matrix and user accounts, so login always works on a clean slate. */
-const FRESH = normalize({});
+import { TInput, BtnPrimary, BtnGhost, SectionTitle, Muted } from "./ui/index.jsx";
+import LogForm from "./LogForm.jsx";
+import EntryCard from "./EntryCard.jsx";
+import Dashboard from "./Dashboard.jsx";
+import TriageGate from "./TriageGate.jsx";
+import RtaUploader from "./RtaUploader.jsx";
+import AgentProfiles from "./AgentProfiles.jsx";
+import DcmEditor from "./DcmEditor.jsx";
+import UserManagement from "./UserManagement.jsx";
+import SettingsView from "./SettingsView.jsx";
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -59,11 +61,29 @@ const NAV = [
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
-export default function App() {
-  const { value: data, update, clear, loaded, saveState } = useLocalStorage(STORAGE_KEY, FRESH, normalize);
-  const { value: session, update: setSession, clear: clearSession, loaded: sessLoaded } = useLocalStorage(SESSION_KEY, null);
+export default function Workspace({ initial, me }) {
+  const {
+    data,
+    error,
+    clearError,
+    addEntry,
+    commitRta,
+    patchEntry,
+    deleteEntry,
+    decide,
+    loadSamples,
+    setDcm,
+    setAccounts,
+    setTls,
+    createUser,
+    resetUser,
+    setUserRole,
+    deleteUser,
+    factoryReset,
+  } = useServerData(initial);
 
-  const [tab, setTab] = useState("dashboard");
+  const allowedTabs = TABS_FOR[me.role] || [];
+  const [tab, setTab] = useState(allowedTabs[0] || "dashboard");
   const [acc, setAcc] = useState("All");
   const [range, setRange] = useState("all"); // all | 30 | month
   const [showForm, setShowForm] = useState(false);
@@ -71,24 +91,9 @@ export default function App() {
   const [assigneeFilter, setAssigneeFilter] = useState("All");
   const [query, setQuery] = useState("");
 
-  /* ── Auth ──────────────────────────────────────────────────────────────── */
-
-  const me = useMemo(
-    () => (session?.userId ? (data.users || []).find((u) => u.id === session.userId) || null : null),
-    [session, data.users]
-  );
-  const allowedTabs = me ? TABS_FOR[me.role] || [] : [];
-
-  // A role change (or login as someone narrower) can leave the UI on a tab the
-  // user may not see — snap to their first permitted tab.
   useEffect(() => {
-    if (me && !allowedTabs.includes(tab)) setTab(allowedTabs[0] || "dashboard");
-  }, [me?.id, me?.role]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const login = (user) => setSession({ userId: user.id, token: makeToken(user), issuedAt: Date.now() });
-  const logout = () => clearSession();
-  const savePassword = (pw) =>
-    update((d) => ({ ...d, users: d.users.map((u) => (u.id === me.id ? setPassword(u, pw) : u)) }));
+    if (!allowedTabs.includes(tab)) setTab(allowedTabs[0] || "dashboard");
+  }, [me.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Derived views ─────────────────────────────────────────────────────── */
 
@@ -125,51 +130,21 @@ export default function App() {
   const deductionPool = scoped.filter(countsForDiscipline).reduce((s, e) => s + (e.deductionApplied || 0), 0);
   const activeEscalations = pendingOps.length + pendingHr.length;
 
-  /* ── Mutations ─────────────────────────────────────────────────────────── */
-  // Every write re-settles the ledger: monthly deduction headroom is shared
-  // between cases, so one edit can change what a neighbour may collect.
+  /* ── Mutations (server-backed; `by` comes from the session server-side) ── */
 
-  const addEntry = (entry) => update((d) => ({ ...d, entries: settleDeductions([entry, ...d.entries]) }));
-  const patchEntry = (entry) =>
-    update((d) => ({ ...d, entries: settleDeductions(d.entries.map((x) => (x.id === entry.id ? entry : x))) }));
-  const deleteEntry = (id) => update((d) => ({ ...d, entries: settleDeductions(d.entries.filter((x) => x.id !== id)) }));
-  const loadSamples = () =>
-    update((d) => ({ ...d, entries: settleDeductions([...buildSamples(d.tls, d.dcm), ...d.entries]) }));
-  const commitRta = (newEntries) =>
-    update((d) => ({ ...d, entries: settleDeductions([...newEntries, ...d.entries]) }));
+  const bulkDecide = (ids, stage, _by, assignee, comment) => decide(ids, stage, assignee, comment);
+  const decideOne = (id, stage, _by, assignee, comment) => decide([id], stage, assignee, comment);
 
-  // Escalation finalizes the verdict (decideCases re-runs the matrix per case,
-  // oldest first), then the whole ledger re-settles its deduction caps.
-  const bulkDecide = (ids, stage, by, assignee, comment) =>
-    update((d) => ({
-      ...d,
-      entries: settleDeductions(decideCases(d.entries, ids, stage, { by, assignee, comment }, d.dcm)),
-    }));
-  const decideOne = (id, stage, by, assignee, comment) => bulkDecide([id], stage, by, assignee, comment);
-
-  const resetAll = () => {
-    if (!window.confirm("This erases every entry AND every user account, then restores defaults. Continue?")) return;
-    clear();
-    clearSession(); // seeded users get fresh ids — the old session can't map to one
-    setTab("dashboard");
+  const resetAll = async () => {
+    if (!window.confirm("Factory reset: erases every case, user and audit row, then reseeds the demo baseline. Continue?")) return;
+    try {
+      await factoryReset();
+    } catch {
+      return; // error strip already shows the reason
+    }
+    // Seeded users carry fresh ids — this session is orphaned by design.
+    signOut({ callbackUrl: "/login" });
   };
-
-  /* ── Gates ─────────────────────────────────────────────────────────────── */
-
-  if (!loaded || !sessLoaded) {
-    return (
-      <div className="ao-body flex items-center justify-center" style={{ minHeight: "100vh", background: P.paper, color: P.sub }}>
-        <div className="ao-mono" style={{ fontSize: 13 }}>
-          Loading tracker…
-        </div>
-      </div>
-    );
-  }
-
-  if (!me) return <LoginView users={data.users || []} onLogin={login} />;
-  if (me.mustChange) return <ChangePasswordView user={me} onSave={savePassword} onCancel={logout} />;
-
-  /* ── Chrome ────────────────────────────────────────────────────────────── */
 
   const empty = data.entries.length === 0;
   const q = query.trim().toLowerCase();
@@ -214,8 +189,7 @@ export default function App() {
               </div>
             </div>
             <span className="flex-1" />
-            <SaveBadge state={saveState} />
-            <UserChip me={me} onLogout={logout} />
+            <UserChip me={me} onLogout={() => signOut({ callbackUrl: "/login" })} />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mt-3">
@@ -254,6 +228,23 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Server error strip */}
+      {error && (
+        <div className="mx-auto px-4" style={{ maxWidth: 1320 }}>
+          <div
+            className="flex items-center gap-2 mt-3 p-3"
+            style={{ background: "#FBF4F3", border: `1px solid ${P.brick}66`, borderRadius: 8 }}
+            role="alert"
+          >
+            <CircleAlert size={15} color={P.brick} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: P.inkSoft, flex: 1 }}>{error}</span>
+            <button onClick={clearError} aria-label="Dismiss error" style={{ border: "none", background: "none", cursor: "pointer", color: P.sub, display: "flex" }}>
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto px-4 pb-16 flex gap-5 items-start" style={{ maxWidth: 1320 }}>
         {/* ── Sidebar ── */}
@@ -313,6 +304,7 @@ export default function App() {
             {showEmpty ? (
               <EmptyState
                 canLog={can(me, "log")}
+                canSamples={can(me, "admin")}
                 onLog={() => {
                   setTab("log");
                   setShowForm(true);
@@ -427,7 +419,7 @@ export default function App() {
                 />
                 <Queue
                   title="HR execution queue"
-                  hint="OPS-approved cases awaiting HR: wage deductions, warning letters and investigations. Completing one requires an HR case reference."
+                  hint="OPS-approved cases awaiting HR: wage deductions, warning letters and investigations. Completing one requires an HR case reference — and flags the case for the agent's digital acknowledgement."
                   rows={pendingHr}
                   tone={P.brick}
                   tls={data.tls}
@@ -440,18 +432,24 @@ export default function App() {
 
             {tab === "agents" && !empty && <AgentProfiles entries={data.entries} accounts={data.accounts} />}
 
-            {tab === "dcm" && can(me, "admin") && (
-              <DcmEditor dcm={data.dcm} onChange={(d) => update((prev) => ({ ...prev, dcm: d }))} />
-            )}
+            {tab === "dcm" && can(me, "admin") && <DcmEditor dcm={data.dcm} onChange={setDcm} />}
 
             {tab === "users" && can(me, "admin") && (
-              <UserManagement users={data.users} me={me} onChange={(users) => update((d) => ({ ...d, users }))} />
+              <UserManagement
+                users={data.users}
+                me={me}
+                onCreate={createUser}
+                onReset={resetUser}
+                onRole={setUserRole}
+                onDelete={deleteUser}
+              />
             )}
 
             {tab === "settings" && can(me, "admin") && (
               <SettingsView
                 data={data}
-                update={update}
+                onAccounts={setAccounts}
+                onTls={setTls}
                 onReset={resetAll}
                 onExport={() => downloadCsv(data.entries)}
                 onLoadSamples={loadSamples}
@@ -569,18 +567,6 @@ function KPI({ label, value, icon: Icon, tone, onClick }) {
   );
 }
 
-function SaveBadge({ state }) {
-  const err = state === "error";
-  return (
-    <div className="flex items-center gap-2" title={err ? "Changes cannot be written to this browser's storage" : "Saved to this browser"}>
-      {err ? <CircleAlert size={12} color={P.brick} /> : <span style={{ width: 8, height: 8, borderRadius: 999, background: P.green, display: "inline-block" }} />}
-      <span className="ao-mono" style={{ fontSize: 11, color: err ? "#E8A79C" : "#8FA6A9" }}>
-        {err ? "Storage unavailable" : "Saved"}
-      </span>
-    </div>
-  );
-}
-
 function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete }) {
   return (
     <div>
@@ -606,7 +592,7 @@ function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete }) {
   );
 }
 
-function EmptyState({ canLog, onLog, onSamples }) {
+function EmptyState({ canLog, canSamples, onLog, onSamples }) {
   return (
     <div className="p-8 text-center" style={{ background: P.card, border: `1px dashed ${P.line}`, borderRadius: 12 }}>
       <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 18, color: P.ink }}>
@@ -622,7 +608,7 @@ function EmptyState({ canLog, onLog, onSamples }) {
             Log first absence
           </BtnPrimary>
         )}
-        <BtnGhost onClick={onSamples}>Load sample data</BtnGhost>
+        {canSamples && <BtnGhost onClick={onSamples}>Load sample data</BtnGhost>}
       </div>
     </div>
   );

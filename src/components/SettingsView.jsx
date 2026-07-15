@@ -55,21 +55,11 @@ function ListEditor({ title, items, onChange, placeholder }) {
   );
 }
 
-export default function SettingsView({ data, update, onReset, onExport, onLoadSamples }) {
+export default function SettingsView({ data, onAccounts, onTls, onReset, onExport, onLoadSamples }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <ListEditor
-        title="Accounts / projects"
-        items={data.accounts}
-        placeholder="e.g. Vodafone"
-        onChange={(v) => update((d) => ({ ...d, accounts: v }))}
-      />
-      <ListEditor
-        title="Team leads / managers"
-        items={data.tls}
-        placeholder="Full name"
-        onChange={(v) => update((d) => ({ ...d, tls: v }))}
-      />
+      <ListEditor title="Accounts / projects" items={data.accounts} placeholder="e.g. Vodafone" onChange={onAccounts} />
+      <ListEditor title="Team leads / managers" items={data.tls} placeholder="Full name" onChange={onTls} />
 
       <Card title="Sample data">
         <Muted>
