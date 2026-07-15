@@ -3,7 +3,7 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
@@ -11,6 +11,7 @@ import { fmtMin, fmtDate, fmtStamp, days } from "../lib/format.js";
 import { todayStr } from "../lib/dates.js";
 import { statusOf } from "../lib/engine.js";
 import { PER_MONTH_CAP } from "../lib/constants.js";
+import { can } from "../lib/auth.js";
 
 const ACTION_LABEL = {
   escalated: "Escalated",
@@ -22,7 +23,7 @@ const ACTION_LABEL = {
   reopened: "Sent back to triage",
 };
 
-export default function EntryCard({ e, tls, onPatch, onDelete }) {
+export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, selectable, selected, onSelect }) {
   const [showHistory, setShowHistory] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [hrRef, setHrRef] = useState(e.hrRef || "");
@@ -57,7 +58,10 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
     });
   };
 
+  // Escalation finalizes the verdict, which needs the whole ledger — the
+  // recompute lives in App (engine.decideCases); this card just reports the call.
   const decide = (stage, by, assignee, text) => {
+    if (onDecide) return onDecide(e.id, stage, by, assignee, text);
     onPatch({
       ...e,
       stage,
@@ -82,12 +86,26 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
       <div className="p-3 flex-1 min-w-0">
         {/* Identity + status */}
         <div className="flex items-center gap-2 flex-wrap">
+          {selectable && (
+            <button
+              onClick={onSelect}
+              aria-label={selected ? "Deselect case" : "Select case"}
+              style={{ border: "none", background: "none", cursor: "pointer", color: selected ? P.petrol : P.sub, display: "flex", padding: 0 }}
+            >
+              {selected ? <CheckSquare size={16} /> : <Square size={16} />}
+            </button>
+          )}
           <span className="ao-mono font-medium truncate" style={{ fontSize: 13, color: P.ink, maxWidth: "60%" }}>
-            {e.email}
+            {e.email || e.agentName || e.empId}
           </span>
           {e.empId && (
             <span className="ao-mono" style={{ fontSize: 11, color: P.sub }}>
               {e.empId}
+            </span>
+          )}
+          {e.lob && (
+            <span className="ao-disp uppercase tracking-wide font-semibold" style={{ fontSize: 10, color: P.sub, border: `1px solid ${P.line}`, borderRadius: 4, padding: "1px 5px" }}>
+              {e.lob}
             </span>
           )}
           <span className="flex-1" />
@@ -155,7 +173,15 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
           </div>
         )}
 
-        {e.stage === "review" && <ReviewBox e={e} tls={tls} onDecide={decide} />}
+        {e.stage === "review" &&
+          (can(me, "triage") ? (
+            <ReviewBox e={e} tls={tls} onDecide={decide} />
+          ) : (
+            <div className="mt-3 p-2 flex items-center gap-2" style={{ background: P.mist, borderRadius: 6, fontSize: 12.5, color: P.sub }}>
+              <Hourglass size={13} />
+              Awaiting Project Manager triage — your role can't rule on this case.
+            </div>
+          ))}
 
         {e.stage === "dismissed" &&
           (e.activity || [])
@@ -170,27 +196,32 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
               </div>
             ))}
 
-        {/* Pipeline */}
+        {/* Pipeline — each step belongs to a role; SuperAdmin can tap them all */}
         {e.stage === "active" && (
           <div className="flex items-center gap-2 flex-wrap mt-3">
             <Toggle
               on={e.notified}
               label="Agent notified"
-              onClick={() => advance("notified", "notified", "Agent notified of the case in writing.")}
+              disabledLook={!can(me, "triage")}
+              title={can(me, "triage") ? "" : "Project Manager step"}
+              onClick={() => can(me, "triage") && advance("notified", "notified", "Agent notified of the case in writing.")}
             />
             <Toggle
               on={e.opsConfirmed}
               label="OPS confirm"
-              disabledLook={!e.notified}
-              title={e.notified ? "" : "Notify the agent first"}
-              onClick={() => e.notified && advance("opsConfirmed", "ops", "Operations manager signed off.")}
+              disabledLook={!e.notified || !can(me, "ops")}
+              title={!can(me, "ops") ? "Operations Lead step" : e.notified ? "" : "Notify the agent first"}
+              onClick={() => e.notified && can(me, "ops") && advance("opsConfirmed", "ops", "Operations manager signed off.")}
             />
             {e.hrNeeded ? (
               e.hrConfirmed ? (
                 <Toggle
                   on
                   label="HR confirm"
+                  disabledLook={!can(me, "hr")}
+                  title={can(me, "hr") ? "" : "HR Business Partner step"}
                   onClick={() =>
+                    can(me, "hr") &&
                     onPatch({ ...e, hrConfirmed: false, activity: [...(e.activity || []), log("comment", "HR confirmation withdrawn.")] })
                   }
                 />
@@ -202,15 +233,15 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
                 on={false}
                 label="HR n/a"
                 disabledLook
-                title="Mark this case as requiring HR"
-                onClick={() => onPatch({ ...e, hrNeeded: true })}
+                title={can(me, "triage") ? "Mark this case as requiring HR" : "Project Manager step"}
+                onClick={() => can(me, "triage") && onPatch({ ...e, hrNeeded: true })}
               />
             )}
           </div>
         )}
 
         {/* HR execution gate */}
-        {e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && (
+        {e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && can(me, "hr") && (
           <div className="mt-3 p-3" style={{ background: "#FBF4F3", border: `1px dashed ${P.brick}66`, borderRadius: 8 }}>
             <Label>HR case reference (required to complete)</Label>
             <div className="flex gap-2 mt-1 flex-wrap">
@@ -235,21 +266,28 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
 
         {/* Footer */}
         <div className="flex items-center gap-2 flex-wrap mt-3" style={{ borderTop: `1px solid ${P.mist}`, paddingTop: 8 }}>
-          {e.stage !== "review" && (
-            <span className="inline-flex items-center gap-1" style={{ fontSize: 12, color: P.sub }}>
-              Assignee
-              <select
-                value={e.assignee || ""}
-                onChange={(ev) => onPatch({ ...e, assignee: ev.target.value })}
-                style={{ fontSize: 12, color: P.ink, border: `1px solid ${P.line}`, borderRadius: 6, padding: "2px 6px", background: "#FBFCFB" }}
-              >
-                <option value="">Unassigned</option>
-                {tls.map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </span>
-          )}
+          {e.stage !== "review" &&
+            (can(me, "triage") ? (
+              <span className="inline-flex items-center gap-1" style={{ fontSize: 12, color: P.sub }}>
+                Assignee
+                <select
+                  value={e.assignee || ""}
+                  onChange={(ev) => onPatch({ ...e, assignee: ev.target.value })}
+                  style={{ fontSize: 12, color: P.ink, border: `1px solid ${P.line}`, borderRadius: 6, padding: "2px 6px", background: "#FBFCFB" }}
+                >
+                  <option value="">Unassigned</option>
+                  {tls.map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </span>
+            ) : (
+              e.assignee && (
+                <span style={{ fontSize: 12, color: P.sub }}>
+                  Assignee <b style={{ color: P.inkSoft }}>{e.assignee}</b>
+                </span>
+              )
+            ))}
           <button
             onClick={() => setShowHistory((s) => !s)}
             className="inline-flex items-center gap-1"
@@ -259,16 +297,18 @@ export default function EntryCard({ e, tls, onPatch, onDelete }) {
             {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
           <span className="flex-1" />
-          <button
-            onClick={() => {
-              if (window.confirm("Delete this entry? This cannot be undone.")) onDelete(e.id);
-            }}
-            className="inline-flex items-center gap-1"
-            style={{ fontSize: 12, color: P.sub, background: "none", border: "none", cursor: "pointer" }}
-          >
-            <Trash2 size={12} />
-            Delete
-          </button>
+          {can(me, "delete") && (
+            <button
+              onClick={() => {
+                if (window.confirm("Delete this entry? This cannot be undone.")) onDelete(e.id);
+              }}
+              className="inline-flex items-center gap-1"
+              style={{ fontSize: 12, color: P.sub, background: "none", border: "none", cursor: "pointer" }}
+            >
+              <Trash2 size={12} />
+              Delete
+            </button>
+          )}
         </div>
 
         {showHistory && (

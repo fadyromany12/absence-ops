@@ -31,6 +31,18 @@ export default function Dashboard({ entries, accounts, escalations }) {
   );
   const maxMin = Math.max(1, ...perAccount.map((p) => p.min));
 
+  const perLob = useMemo(() => {
+    const m = {};
+    for (const e of live) {
+      const lob = e.lob || "Unassigned";
+      if (!m[lob]) m[lob] = { lob, count: 0, min: 0 };
+      m[lob].count++;
+      m[lob].min += e.missingMin || 0;
+    }
+    return Object.values(m).sort((a, b) => b.min - a.min);
+  }, [live]);
+  const maxLob = Math.max(1, ...perLob.map((p) => p.min));
+
   const bySeverity = useMemo(() => {
     const m = Object.fromEntries(SEV_ORDER.map((s) => [s, 0]));
     let leave = 0;
@@ -151,6 +163,33 @@ export default function Dashboard({ entries, accounts, escalations }) {
         {/* Violation class distribution */}
         <Card title="Violation class distribution">
           <SeverityDonut tiers={bySeverity.tiers} leave={bySeverity.leave} total={live.length} />
+        </Card>
+
+        {/* Hours lost per LOB */}
+        <Card title="Hours lost per line of business">
+          {perLob.length === 0 ? (
+            <Muted>No LOB data yet — RTA imports carry it; manual entries can set it on the log form.</Muted>
+          ) : (
+            <div className="grid gap-3">
+              {perLob.map((p) => (
+                <div key={p.lob}>
+                  <div className="flex items-center gap-2">
+                    <span className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 12.5, color: p.lob === "Unassigned" ? P.sub : P.ink }}>
+                      {p.lob}
+                    </span>
+                    <span className="flex-1" />
+                    <span className="ao-mono font-semibold" style={{ fontSize: 13, color: P.brick }}>
+                      {fmtMin(p.min)}
+                    </span>
+                  </div>
+                  <div className="mt-1" style={{ background: P.mist, borderRadius: 4, height: 10, overflow: "hidden" }}>
+                    <div style={{ width: `${(p.min / maxLob) * 100}%`, height: "100%", background: p.lob === "Unassigned" ? P.sub : P.petrol }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: P.sub, marginTop: 2 }}>{p.count} records</div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Breakdown by type */}

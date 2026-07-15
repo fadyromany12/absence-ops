@@ -35,3 +35,12 @@ export const days = (n) => `${n} day${n === 1 ? "" : "s"}`;
 
 /** `plural(1, "case")` -> "1 case"; `plural(3, "entry", "entries")` -> "3 entries". */
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many || `${one}s`}`;
+
+/** "nour.said@demo.konecta" -> "Nour Said". Empty in, empty out. */
+export const nameFromEmail = (email) =>
+  String(email || "")
+    .split("@")[0]
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");

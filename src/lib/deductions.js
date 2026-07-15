@@ -12,6 +12,7 @@
 
 import { PER_INCIDENT_CAP, PER_MONTH_CAP } from "./constants.js";
 import { monthOf } from "./dates.js";
+import { agentMatches, toAgentRef } from "./identity.js";
 
 /** Days of deduction named by a DCM action string, e.g. "…+ 3-day deduction" -> 3. */
 export function deductionDaysOf(action) {
@@ -20,17 +21,15 @@ export function deductionDaysOf(action) {
   return m ? Number(m[1]) : 0;
 }
 
-const sameAgent = (e, email) => (e.email || "").trim().toLowerCase() === (email || "").trim().toLowerCase();
-
 /** Deduction days already committed for this agent in the calendar month of `date`.
     Dismissed cases never count — they were thrown out at triage. */
-export function monthDeductionUsed(entries, email, date, excludeId) {
+export function monthDeductionUsed(entries, agent, date, excludeId) {
   const month = monthOf(date);
   return entries
     .filter(
       (e) =>
         e.id !== excludeId &&
-        sameAgent(e, email) &&
+        agentMatches(e, agent) &&
         e.stage !== "dismissed" &&
         monthOf(e.date) === month
     )
@@ -50,10 +49,13 @@ export function monthDeductionUsed(entries, email, date, excludeId) {
  *   waived: number        // prescribed days the law writes off
  * }}
  */
-export function applyLaborLawCap(prescribed, { entries, email, date, excludeId } = {}) {
+export function applyLaborLawCap(prescribed, { entries, agent, email, empId, date, excludeId } = {}) {
   const raw = Math.max(0, prescribed || 0);
   const perIncident = Math.min(raw, PER_INCIDENT_CAP);
-  const monthUsed = entries ? monthDeductionUsed(entries, email, date, excludeId) : 0;
+  // `agent` is the {email, empId} ref; bare email/empId fields are accepted for
+  // callers written against the original email-only API.
+  const ref = agent ? toAgentRef(agent) : { email, empId };
+  const monthUsed = entries ? monthDeductionUsed(entries, ref, date, excludeId) : 0;
   const headroom = Math.max(0, PER_MONTH_CAP - monthUsed);
   const applied = Math.min(perIncident, headroom);
   return {
@@ -88,7 +90,7 @@ export function settleDeductions(entries) {
   const byId = new Map();
   for (const e of chronological) {
     const prescribed = e.deductionDays ?? deductionDaysOf(e.action);
-    const cap = applyLaborLawCap(prescribed, { entries: settled, email: e.email, date: e.date, excludeId: e.id });
+    const cap = applyLaborLawCap(prescribed, { entries: settled, agent: e, date: e.date, excludeId: e.id });
     const next = {
       ...e,
       deductionDays: prescribed,

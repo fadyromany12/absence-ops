@@ -165,5 +165,104 @@ console.log("\n── Escalation flags ──");
   eq("dismissed raises no flag", computeEscalations(es).length, 0);
 }
 
+/* ── v4 additions: identity, compensation, RTA, auth ─────────────────────── */
+
+const { agentMatches, agentKeyOf } = await import(`${LIB}/identity.js`);
+const { applyCompensation } = await import(`${LIB}/compensation.js`);
+const { parseCsv, parseDur, parseRtaDate, mapHeaders, assessRta, buildEntries, TEMPLATE_CSV } = await import(`${LIB}/rta.js`);
+const { makeUser, verifyPassword, setPassword, resetPassword, DEFAULT_PASSWORD } = await import(`${LIB}/auth.js`);
+
+console.log("\n── Agent identity (empId OR email) ──");
+eq("email matches email", agentMatches({ email: "A@x", empId: "" }, { email: "a@x" }), true);
+eq("empId matches empId", agentMatches({ email: "", empId: "eg0412" }, { empId: "EG0412" }), true);
+eq("string ref still works", agentMatches({ email: "a@x" }, "a@x"), true);
+eq("no shared identifier -> no match", agentMatches({ email: "a@x", empId: "" }, { empId: "EG1" }), false);
+eq("both empty -> no match", agentMatches({ email: "", empId: "" }, { email: "", empId: "" }), false);
+eq("key prefers empId", agentKeyOf({ email: "a@x", empId: "EG1" }), "eg1");
+{
+  // The point of the rework: an email-keyed manual case and an ID-keyed RTA
+  // case for the same person must chain into one occurrence count.
+  const es = [mk({ date: D(10), violation: "NCNS", email: "a@x", empId: "EG0412" })];
+  eq("RTA row (empId only) chains with manual history", occurrenceFor(es, { email: "", empId: "EG0412" }, "NCNS", D(0)).occ, 2);
+}
+
+console.log("\n── Compensable hours (spec 4D) ──");
+{
+  const c = applyCompensation({ tardyMin: 25, compMin: 25 });
+  eq("fully compensated", [c.net, c.fullyCompensated], [0, true]);
+}
+{
+  const c = applyCompensation({ tardyMin: 30, missingMin: 60, compMin: 45 });
+  eq("partial: 90 lost, 45 comp -> 45 net", [c.lost, c.net, c.partiallyCompensated], [90, 45, true]);
+}
+{
+  const c = applyCompensation({ missingMin: 30, compMin: 90 });
+  eq("comp never exceeds lost", [c.comp, c.net], [30, 0]);
+}
+eq("nothing lost -> not 'fully compensated'", applyCompensation({ compMin: 60 }).fullyCompensated, false);
+
+console.log("\n── RTA parsing ──");
+eq("parseDur H:MM", [parseDur("0:25"), parseDur("9:00")], [25, 540]);
+eq("parseDur decimal hours", [parseDur("1.5"), parseDur("0"), parseDur("")], [90, 0, 0]);
+eq("parseRtaDate ISO", parseRtaDate("2026-07-14"), "2026-07-14");
+eq("parseRtaDate DD/MM/YYYY", parseRtaDate("14/07/2026"), "2026-07-14");
+eq("parseRtaDate MM/DD disambiguated", parseRtaDate("07/14/2026"), "2026-07-14");
+eq("parseRtaDate garbage", parseRtaDate("yesterday"), "");
+eq("quoted comma survives", parseCsv('a,"b,c",d')[0], ["a", "b,c", "d"]);
+eq("escaped quote survives", parseCsv('a,"say ""hi""",c')[0], ["a", 'say "hi"', "c"]);
+{
+  const map = mapHeaders(["LOB", "Date", "Employee Name", "Employee ID", "Shift Start", "Shift End", "Status", "Executor Name", "Tardy", "Missing Hours", "Early Departure", "Hours can be compenstaed", "Status / Violation"]);
+  eq("all 13 RTA headers map", Object.keys(map).length, 13);
+  eq("typo'd compensated column maps", map.comp, 11);
+  eq("Status vs Status/Violation kept apart", [map.status, map.violation], [6, 12]);
+}
+{
+  const a = assessRta(TEMPLATE_CSV, DEFAULT_DCM);
+  eq("template classifies", [a.counts.irregular, a.counts.compensated, a.counts.clean, a.counts.error || 0], [2, 1, 1, 0]);
+  const built = buildEntries(a.rows, { account: "Beko", entries: [], dcm: DEFAULT_DCM, uploadedBy: "WFM" });
+  eq("template commits 2 to triage + 1 auto-ack", [built.toTriage, built.acked], [2, 1]);
+  const ack = built.entries.find((e) => e.stage === "active");
+  eq("auto-ack is closed and non-disciplinary", [ack.disciplinary, ack.deductionApplied, ack.opsConfirmed], [false, 0, true]);
+}
+{
+  // Two NCNS for one agent in one file: at upload both verdicts are provisional
+  // №1 (pending cases never count), and the chain forms when the PM escalates —
+  // decideCases re-verdicts oldest-first, so the second becomes a 2nd occurrence.
+  const { decideCases } = await import(`${LIB}/engine.js`);
+  const csv = [
+    "Date,Employee Name,Employee ID,Status,Tardy,Missing Hours,Early Departure,Hours can be compenstaed",
+    `${D(3)},Tarek H,EG0644,NCNS,0,9:00,0,0`,
+    `${D(1)},Tarek H,EG0644,NCNS,0,9:00,0,0`,
+  ].join("\n");
+  const a = assessRta(csv, DEFAULT_DCM);
+  const built = buildEntries(a.rows, { account: "Beko", entries: [], dcm: DEFAULT_DCM, uploadedBy: "WFM" });
+  eq("upload-time verdicts are provisional №1s", built.entries.map((e) => e.occurrence), [1, 1]);
+
+  const decided = decideCases(built.entries, built.entries.map((e) => e.id), "active", { by: "PM", assignee: "TL", comment: "Verified against RTA." }, DEFAULT_DCM);
+  const byDate = [...decided].sort((x, y) => x.date.localeCompare(y.date));
+  eq("bulk escalation chains 1st -> 2nd", byDate.map((e) => e.occurrence), [1, 2]);
+  eq("escalated actions follow the NCNS progression", byDate.map((e) => e.action), ["Written Warning + 3-day deduction", "Final Warning + 5-day deduction"]);
+  eq("second NCNS capped by month headroom (3, then 5 -> 2)", byDate.map((e) => e.deductionApplied), [3, 2]);
+  eq("both carry the escalation log entry", decided.every((e) => e.activity.some((x) => x.type === "escalated")), true);
+}
+{
+  // Dismissal must not re-verdict — the provisional verdict is archived as-is.
+  const { decideCases } = await import(`${LIB}/engine.js`);
+  const es = [mk({ date: D(2), violation: "NCNS", stage: "review", occurrence: 1, action: "Written Warning + 3-day deduction" })];
+  const out = decideCases(es, [es[0].id], "dismissed", { by: "PM", assignee: "", comment: "System outage." }, DEFAULT_DCM);
+  eq("dismiss keeps stage + verdict untouched", [out[0].stage, out[0].occurrence], ["dismissed", 1]);
+}
+
+console.log("\n── Mock auth ──");
+{
+  const u = makeUser({ name: "T", email: "T@X.com", role: "WFM" });
+  eq("email normalised", u.email, "t@x.com");
+  eq("default password verifies, wrong doesn't", [verifyPassword(u, DEFAULT_PASSWORD), verifyPassword(u, "nope")], [true, false]);
+  const changed = setPassword(u, "S3cret!!");
+  eq("changed password verifies, old doesn't, flag cleared", [verifyPassword(changed, "S3cret!!"), verifyPassword(changed, DEFAULT_PASSWORD), changed.mustChange], [true, false, false]);
+  const back = resetPassword(changed);
+  eq("reset restores default + mustChange", [verifyPassword(back, DEFAULT_PASSWORD), back.mustChange], [true, true]);
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

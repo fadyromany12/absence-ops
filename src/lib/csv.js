@@ -6,7 +6,9 @@ import { statusOf } from "./engine.js";
 
 const HEAD = [
   "Account",
+  "LOB",
   "Date",
+  "Agent Name",
   "Agent Email",
   "Employee ID",
   "Logged By",
@@ -23,7 +25,10 @@ const HEAD = [
   "Deduction Prescribed (days)",
   "Deduction Applied (days)",
   "Deduction Waived by Cap (days)",
-  "Missing Minutes",
+  "Tardy (min)",
+  "Early Departure (min)",
+  "Compensable (min)",
+  "Missing Minutes (net)",
   "Stage",
   "Review Comment",
   "Agent Notified",
@@ -43,7 +48,9 @@ export function toCsv(entries) {
     const applied = e.deductionApplied || 0;
     return [
       e.account,
+      e.lob || "",
       e.date,
+      e.agentName || "",
       e.email,
       e.empId,
       e.tl,
@@ -60,6 +67,9 @@ export function toCsv(entries) {
       prescribed,
       applied,
       Math.max(0, prescribed - applied),
+      e.tardyMin || 0,
+      e.earlyMin || 0,
+      e.compMin || 0,
       e.missingMin,
       e.stage,
       review ? `${review.by}: ${review.text}` : "",

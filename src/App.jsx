@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   ClipboardPlus,
+  UploadCloud,
   Inbox,
   CheckCheck,
   Users,
   Table2,
+  UserCog,
   Settings2,
   Clock3,
   Scale,
@@ -13,39 +15,53 @@ import {
   Plus,
   CircleCheck,
   CircleAlert,
+  LogOut,
 } from "lucide-react";
 
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { P, accColor } from "./lib/tokens.js";
-import { STORAGE_KEY, DEFAULTS } from "./lib/constants.js";
+import { STORAGE_KEY, SESSION_KEY } from "./lib/constants.js";
 import { normalize } from "./lib/storage.js";
 import { settleDeductions } from "./lib/deductions.js";
 import { todayStr, daysAgo, monthOf } from "./lib/dates.js";
 import { fmtMin } from "./lib/format.js";
-import { statusOf, computeEscalations, countsForDiscipline } from "./lib/engine.js";
+import { statusOf, computeEscalations, countsForDiscipline, decideCases } from "./lib/engine.js";
 import { buildSamples } from "./lib/samples.js";
 import { downloadCsv } from "./lib/csv.js";
+import { TABS_FOR, ROLE_LABEL, can, makeToken, setPassword } from "./lib/auth.js";
 
 import { TInput, BtnPrimary, BtnGhost, SectionTitle, Muted } from "./components/ui/index.jsx";
+import { LoginView, ChangePasswordView } from "./components/LoginView.jsx";
 import LogForm from "./components/LogForm.jsx";
 import EntryCard from "./components/EntryCard.jsx";
 import Dashboard from "./components/Dashboard.jsx";
+import TriageGate from "./components/TriageGate.jsx";
+import RtaUploader from "./components/RtaUploader.jsx";
 import AgentProfiles from "./components/AgentProfiles.jsx";
 import DcmEditor from "./components/DcmEditor.jsx";
+import UserManagement from "./components/UserManagement.jsx";
 import SettingsView from "./components/SettingsView.jsx";
+
+/* Seeded once at module load: the state a browser gets before anything is
+   stored, and the state a hard reset returns to. normalize({}) seeds the
+   default matrix and user accounts, so login always works on a clean slate. */
+const FRESH = normalize({});
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "log", label: "Daily log", icon: ClipboardPlus },
+  { id: "rta", label: "RTA upload", icon: UploadCloud },
   { id: "triage", label: "Triage gate", icon: Inbox, badge: "review" },
   { id: "approvals", label: "Approvals", icon: CheckCheck, badge: "approvals" },
   { id: "agents", label: "Agents", icon: Users },
   { id: "dcm", label: "DCM matrix", icon: Table2 },
+  { id: "users", label: "Users", icon: UserCog },
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
 
 export default function App() {
-  const { value: data, update, clear, loaded, saveState } = useLocalStorage(STORAGE_KEY, DEFAULTS, normalize);
+  const { value: data, update, clear, loaded, saveState } = useLocalStorage(STORAGE_KEY, FRESH, normalize);
+  const { value: session, update: setSession, clear: clearSession, loaded: sessLoaded } = useLocalStorage(SESSION_KEY, null);
 
   const [tab, setTab] = useState("dashboard");
   const [acc, setAcc] = useState("All");
@@ -54,6 +70,25 @@ export default function App() {
   const [logFilter, setLogFilter] = useState("all"); // all | review | open
   const [assigneeFilter, setAssigneeFilter] = useState("All");
   const [query, setQuery] = useState("");
+
+  /* ── Auth ──────────────────────────────────────────────────────────────── */
+
+  const me = useMemo(
+    () => (session?.userId ? (data.users || []).find((u) => u.id === session.userId) || null : null),
+    [session, data.users]
+  );
+  const allowedTabs = me ? TABS_FOR[me.role] || [] : [];
+
+  // A role change (or login as someone narrower) can leave the UI on a tab the
+  // user may not see — snap to their first permitted tab.
+  useEffect(() => {
+    if (me && !allowedTabs.includes(tab)) setTab(allowedTabs[0] || "dashboard");
+  }, [me?.id, me?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const login = (user) => setSession({ userId: user.id, token: makeToken(user), issuedAt: Date.now() });
+  const logout = () => clearSession();
+  const savePassword = (pw) =>
+    update((d) => ({ ...d, users: d.users.map((u) => (u.id === me.id ? setPassword(u, pw) : u)) }));
 
   /* ── Derived views ─────────────────────────────────────────────────────── */
 
@@ -100,16 +135,28 @@ export default function App() {
   const deleteEntry = (id) => update((d) => ({ ...d, entries: settleDeductions(d.entries.filter((x) => x.id !== id)) }));
   const loadSamples = () =>
     update((d) => ({ ...d, entries: settleDeductions([...buildSamples(d.tls, d.dcm), ...d.entries]) }));
+  const commitRta = (newEntries) =>
+    update((d) => ({ ...d, entries: settleDeductions([...newEntries, ...d.entries]) }));
+
+  // Escalation finalizes the verdict (decideCases re-runs the matrix per case,
+  // oldest first), then the whole ledger re-settles its deduction caps.
+  const bulkDecide = (ids, stage, by, assignee, comment) =>
+    update((d) => ({
+      ...d,
+      entries: settleDeductions(decideCases(d.entries, ids, stage, { by, assignee, comment }, d.dcm)),
+    }));
+  const decideOne = (id, stage, by, assignee, comment) => bulkDecide([id], stage, by, assignee, comment);
 
   const resetAll = () => {
-    if (!window.confirm("This erases every logged entry and restores defaults. Continue?")) return;
+    if (!window.confirm("This erases every entry AND every user account, then restores defaults. Continue?")) return;
     clear();
+    clearSession(); // seeded users get fresh ids — the old session can't map to one
     setTab("dashboard");
   };
 
-  /* ── Chrome ────────────────────────────────────────────────────────────── */
+  /* ── Gates ─────────────────────────────────────────────────────────────── */
 
-  if (!loaded) {
+  if (!loaded || !sessLoaded) {
     return (
       <div className="ao-body flex items-center justify-center" style={{ minHeight: "100vh", background: P.paper, color: P.sub }}>
         <div className="ao-mono" style={{ fontSize: 13 }}>
@@ -118,6 +165,11 @@ export default function App() {
       </div>
     );
   }
+
+  if (!me) return <LoginView users={data.users || []} onLogin={login} />;
+  if (me.mustChange) return <ChangePasswordView user={me} onSave={savePassword} onCancel={logout} />;
+
+  /* ── Chrome ────────────────────────────────────────────────────────────── */
 
   const empty = data.entries.length === 0;
   const q = query.trim().toLowerCase();
@@ -130,12 +182,19 @@ export default function App() {
     if (assigneeFilter !== "All") {
       if (assigneeFilter === "Unassigned" ? (e.assignee || "") !== "" : e.assignee !== assigneeFilter) return false;
     }
-    if (q && !(e.email || "").toLowerCase().includes(q) && !(e.empId || "").toLowerCase().includes(q)) return false;
+    if (
+      q &&
+      !(e.email || "").toLowerCase().includes(q) &&
+      !(e.empId || "").toLowerCase().includes(q) &&
+      !(e.agentName || "").toLowerCase().includes(q)
+    )
+      return false;
     return true;
   });
 
   const badges = { review: pendingReview.length, approvals: pendingOps.length + pendingHr.length };
-  const showEmpty = empty && !(tab === "log" && showForm) && !["settings", "dcm"].includes(tab);
+  const nav = NAV.filter((n) => allowedTabs.includes(n.id));
+  const showEmpty = empty && !(tab === "log" && showForm) && !["settings", "dcm", "rta", "users"].includes(tab);
 
   return (
     <div className="ao-body" style={{ minHeight: "100vh", background: P.paper, color: P.ink }}>
@@ -156,6 +215,7 @@ export default function App() {
             </div>
             <span className="flex-1" />
             <SaveBadge state={saveState} />
+            <UserChip me={me} onLogout={logout} />
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mt-3">
@@ -199,55 +259,60 @@ export default function App() {
         {/* ── Sidebar ── */}
         <nav className="hidden md:block py-4" style={{ width: 190, flexShrink: 0, position: "sticky", top: 0 }}>
           <div className="grid gap-1">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <NavItem key={n.id} item={n} active={tab === n.id} badge={badges[n.badge] || 0} onClick={() => setTab(n.id)} />
             ))}
           </div>
-          <div className="mt-4">
-            <BtnPrimary
-              icon={Plus}
-              onClick={() => {
-                setTab("log");
-                setShowForm(true);
-              }}
-            >
-              Log absence
-            </BtnPrimary>
-          </div>
+          {can(me, "log") && (
+            <div className="mt-4">
+              <BtnPrimary
+                icon={Plus}
+                onClick={() => {
+                  setTab("log");
+                  setShowForm(true);
+                }}
+              >
+                Log absence
+              </BtnPrimary>
+            </div>
+          )}
         </nav>
 
         {/* ── Main ── */}
         <main className="flex-1 min-w-0 pb-4">
           {/* Mobile nav */}
           <div className="md:hidden flex gap-2 overflow-x-auto mt-4 pb-1">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <NavChip key={n.id} item={n} active={tab === n.id} badge={badges[n.badge] || 0} onClick={() => setTab(n.id)} />
             ))}
           </div>
 
-          {/* KPI scorecard */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-            <KPI label="Total hours lost" value={fmtMin(hoursLost)} icon={Clock3} tone={hoursLost ? P.brick : P.green} />
-            <KPI
-              label="Pending triage review"
-              value={pendingReview.length}
-              icon={Inbox}
-              tone={pendingReview.length ? P.petrol : P.green}
-              onClick={() => setTab("triage")}
-            />
-            <KPI
-              label="Active escalations"
-              value={activeEscalations}
-              icon={TriangleAlert}
-              tone={activeEscalations ? P.amber : P.green}
-              onClick={() => setTab("approvals")}
-            />
-            <KPI label="Deduction pool" value={`${deductionPool}d`} icon={Scale} tone={deductionPool ? P.ink : P.green} />
-          </div>
+          {/* KPI scorecard — noise for WFM, whose whole job here is the upload */}
+          {me.role !== "WFM" && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+              <KPI label="Total hours lost" value={fmtMin(hoursLost)} icon={Clock3} tone={hoursLost ? P.brick : P.green} />
+              <KPI
+                label="Pending triage review"
+                value={pendingReview.length}
+                icon={Inbox}
+                tone={pendingReview.length ? P.petrol : P.green}
+                onClick={allowedTabs.includes("triage") ? () => setTab("triage") : undefined}
+              />
+              <KPI
+                label="Active escalations"
+                value={activeEscalations}
+                icon={TriangleAlert}
+                tone={activeEscalations ? P.amber : P.green}
+                onClick={allowedTabs.includes("approvals") ? () => setTab("approvals") : undefined}
+              />
+              <KPI label="Deduction pool" value={`${deductionPool}d`} icon={Scale} tone={deductionPool ? P.ink : P.green} />
+            </div>
+          )}
 
           <div className="mt-4">
             {showEmpty ? (
               <EmptyState
+                canLog={can(me, "log")}
                 onLog={() => {
                   setTab("log");
                   setShowForm(true);
@@ -262,10 +327,11 @@ export default function App() {
 
             {tab === "log" && (
               <div className="grid gap-4">
-                {showForm ? (
+                {showForm && can(me, "log") ? (
                   <LogForm data={data} defaultAccount={acc} onAdd={addEntry} onCancel={() => setShowForm(false)} />
                 ) : (
-                  !empty && (
+                  !empty &&
+                  can(me, "log") && (
                     <div>
                       <BtnPrimary icon={Plus} onClick={() => setShowForm(true)}>
                         Log absence
@@ -324,7 +390,7 @@ export default function App() {
                     <div className="grid gap-2">
                       {visibleLog.length === 0 && <Muted>Nothing matches these filters.</Muted>}
                       {visibleLog.map((e) => (
-                        <EntryCard key={e.id} e={e} tls={data.tls} onPatch={patchEntry} onDelete={deleteEntry} />
+                        <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} />
                       ))}
                     </div>
                   </>
@@ -332,31 +398,19 @@ export default function App() {
               </div>
             )}
 
+            {tab === "rta" && can(me, "upload") && <RtaUploader data={data} me={me} onCommit={commitRta} />}
+
             {tab === "triage" && !empty && (
-              <div>
-                <SectionTitle count={pendingReview.length}>Pending manager review</SectionTitle>
-                <div className="mb-3">
-                  <Muted>
-                    Nothing here is punitive yet. Assign a manager, write at least 15 characters of context, then
-                    escalate into the OPS queue or dismiss and archive.
-                  </Muted>
-                </div>
-                {pendingReview.length === 0 ? (
-                  <div className="p-6 text-center" style={{ background: P.card, border: `1px dashed ${P.line}`, borderRadius: 10 }}>
-                    <CircleCheck size={22} color={P.green} style={{ margin: "0 auto" }} />
-                    <div className="ao-disp font-bold uppercase tracking-wide mt-2" style={{ fontSize: 14, color: P.ink }}>
-                      Inbox clear
-                    </div>
-                    <Muted>Every logged case has been reviewed.</Muted>
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {pendingReview.map((e) => (
-                      <EntryCard key={e.id} e={e} tls={data.tls} onPatch={patchEntry} onDelete={deleteEntry} />
-                    ))}
-                  </div>
-                )}
-              </div>
+              <TriageGate
+                rows={pendingReview}
+                tls={data.tls}
+                me={me}
+                canAct={can(me, "triage")}
+                onPatch={patchEntry}
+                onDelete={deleteEntry}
+                onDecide={decideOne}
+                onBulk={bulkDecide}
+              />
             )}
 
             {tab === "approvals" && !empty && (
@@ -367,6 +421,7 @@ export default function App() {
                   rows={pendingOps}
                   tone={P.amber}
                   tls={data.tls}
+                  me={me}
                   onPatch={patchEntry}
                   onDelete={deleteEntry}
                 />
@@ -376,6 +431,7 @@ export default function App() {
                   rows={pendingHr}
                   tone={P.brick}
                   tls={data.tls}
+                  me={me}
                   onPatch={patchEntry}
                   onDelete={deleteEntry}
                 />
@@ -384,9 +440,15 @@ export default function App() {
 
             {tab === "agents" && !empty && <AgentProfiles entries={data.entries} accounts={data.accounts} />}
 
-            {tab === "dcm" && <DcmEditor dcm={data.dcm} onChange={(d) => update((prev) => ({ ...prev, dcm: d }))} />}
+            {tab === "dcm" && can(me, "admin") && (
+              <DcmEditor dcm={data.dcm} onChange={(d) => update((prev) => ({ ...prev, dcm: d }))} />
+            )}
 
-            {tab === "settings" && (
+            {tab === "users" && can(me, "admin") && (
+              <UserManagement users={data.users} me={me} onChange={(users) => update((d) => ({ ...d, users }))} />
+            )}
+
+            {tab === "settings" && can(me, "admin") && (
               <SettingsView
                 data={data}
                 update={update}
@@ -403,6 +465,29 @@ export default function App() {
 }
 
 /* ── Chrome pieces ───────────────────────────────────────────────────────── */
+
+function UserChip({ me, onLogout }) {
+  return (
+    <div className="flex items-center gap-2 pl-3" style={{ borderLeft: "1px solid #3A545C" }}>
+      <div className="text-right min-w-0">
+        <div className="ao-disp font-semibold truncate" style={{ fontSize: 12.5, color: "#F2F6F5", lineHeight: 1.2 }}>
+          {me.name}
+        </div>
+        <div className="ao-mono" style={{ fontSize: 10, color: "#8FA6A9" }}>
+          {ROLE_LABEL[me.role]}
+        </div>
+      </div>
+      <button
+        onClick={onLogout}
+        title="Sign out"
+        aria-label="Sign out"
+        style={{ border: "1px solid #3A545C", background: "transparent", color: "#C9D6D4", borderRadius: 6, padding: 6, cursor: "pointer", display: "flex" }}
+      >
+        <LogOut size={13} />
+      </button>
+    </div>
+  );
+}
 
 function NavItem({ item, active, badge, onClick }) {
   const Icon = item.icon;
@@ -496,7 +581,7 @@ function SaveBadge({ state }) {
   );
 }
 
-function Queue({ title, hint, rows, tone, tls, onPatch, onDelete }) {
+function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete }) {
   return (
     <div>
       <SectionTitle count={rows.length} tone={tone}>
@@ -513,7 +598,7 @@ function Queue({ title, hint, rows, tone, tls, onPatch, onDelete }) {
       ) : (
         <div className="grid gap-2">
           {rows.map((e) => (
-            <EntryCard key={e.id} e={e} tls={tls} onPatch={onPatch} onDelete={onDelete} />
+            <EntryCard key={e.id} e={e} tls={tls} me={me} onPatch={onPatch} onDelete={onDelete} />
           ))}
         </div>
       )}
@@ -521,7 +606,7 @@ function Queue({ title, hint, rows, tone, tls, onPatch, onDelete }) {
   );
 }
 
-function EmptyState({ onLog, onSamples }) {
+function EmptyState({ canLog, onLog, onSamples }) {
   return (
     <div className="p-8 text-center" style={{ background: P.card, border: `1px dashed ${P.line}`, borderRadius: 12 }}>
       <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 18, color: P.ink }}>
@@ -532,9 +617,11 @@ function EmptyState({ onLog, onSamples }) {
         comment, and the case is routed through OPS and HR confirmation.
       </div>
       <div className="flex gap-3 justify-center flex-wrap mt-5">
-        <BtnPrimary onClick={onLog} icon={Plus}>
-          Log first absence
-        </BtnPrimary>
+        {canLog && (
+          <BtnPrimary onClick={onLog} icon={Plus}>
+            Log first absence
+          </BtnPrimary>
+        )}
         <BtnGhost onClick={onSamples}>Load sample data</BtnGhost>
       </div>
     </div>

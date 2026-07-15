@@ -1,8 +1,8 @@
 /* Tab E — agent compliance profiles.
 
    The ledger keeps no separate agent registry: agents are whoever appears in a
-   case, keyed by email. A display name is derived from the address rather than
-   stored, so it can never drift out of sync with the cases themselves. */
+   case, keyed by employee ID when one exists, else by email. RTA imports carry
+   a real display name; manual entries derive one from the email address. */
 
 import { useMemo, useState } from "react";
 import { Search, UserRound, CalendarClock, Scale, ShieldAlert, CircleSlash } from "lucide-react";
@@ -13,15 +13,6 @@ import { addDays } from "../lib/dates.js";
 import { RESET_DAYS, PER_MONTH_CAP, EMERGENCY_QUOTA } from "../lib/constants.js";
 import { statusOf } from "../lib/engine.js";
 import { listAgents, agentSummary, agentTimeline } from "../lib/agents.js";
-
-/** "nour.said@demo.konecta" -> "Nour Said" */
-export const nameFromEmail = (email) =>
-  String(email || "")
-    .split("@")[0]
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
 
 export default function AgentProfiles({ entries, accounts }) {
   const [q, setQ] = useState("");
@@ -34,22 +25,22 @@ export default function AgentProfiles({ entries, accounts }) {
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return agents
-      .map((a) => ({ ...a, name: nameFromEmail(a.email), summary: agentSummary(entries, a.email) }))
+      .map((a) => ({ ...a, summary: agentSummary(entries, { email: a.email, empId: a.empId }) }))
       .filter((a) => {
         if (account !== "All" && a.account !== account) return false;
         if (warnFilter === "Active warnings" && a.summary.activeWarnings.length === 0) return false;
         if (warnFilter === "Clear" && a.summary.activeWarnings.length > 0) return false;
         if (!needle) return true;
         return (
-          a.email.toLowerCase().includes(needle) ||
-          a.name.toLowerCase().includes(needle) ||
+          (a.email || "").toLowerCase().includes(needle) ||
+          (a.name || "").toLowerCase().includes(needle) ||
           (a.empId || "").toLowerCase().includes(needle)
         );
       });
   }, [agents, entries, q, account, warnFilter]);
 
   const active = useMemo(() => {
-    const pick = rows.find((r) => r.email === selected) || rows[0];
+    const pick = rows.find((r) => r.key === selected) || rows[0];
     return pick || null;
   }, [rows, selected]);
 
@@ -101,12 +92,12 @@ export default function AgentProfiles({ entries, accounts }) {
         <div className="grid gap-2" style={{ maxHeight: 560, overflowY: "auto" }}>
           {rows.length === 0 && <Muted>No agents match those filters.</Muted>}
           {rows.map((a) => {
-            const on = active && a.email === active.email;
+            const on = active && a.key === active.key;
             const warns = a.summary.activeWarnings.length;
             return (
               <button
-                key={a.email}
-                onClick={() => setSelected(a.email)}
+                key={a.key}
+                onClick={() => setSelected(a.key)}
                 className="text-left p-3 flex"
                 style={{
                   background: on ? P.ink : P.card,
@@ -120,7 +111,7 @@ export default function AgentProfiles({ entries, accounts }) {
                     {a.name}
                   </div>
                   <div className="ao-mono truncate" style={{ fontSize: 11, color: on ? "#8FA6A9" : P.sub }}>
-                    {a.empId || "—"} · {a.email}
+                    {a.empId || "—"} · {a.email || "no email on file"}
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1" style={{ fontSize: 11, color: on ? "#C9D6D4" : P.sub }}>
@@ -151,7 +142,10 @@ export default function AgentProfiles({ entries, accounts }) {
 
 function Profile({ agent, entries }) {
   const s = agent.summary;
-  const timeline = useMemo(() => agentTimeline(entries, agent.email, RESET_DAYS), [entries, agent.email]);
+  const timeline = useMemo(
+    () => agentTimeline(entries, { email: agent.email, empId: agent.empId }, RESET_DAYS),
+    [entries, agent.email, agent.empId]
+  );
   const capHit = s.monthDeduction >= PER_MONTH_CAP;
 
   return (
@@ -169,7 +163,7 @@ function Profile({ agent, entries }) {
             <Pill color="#8FB6B3">{agent.account}</Pill>
           </div>
           <div className="ao-mono mt-1" style={{ fontSize: 12, color: "#8FA6A9" }}>
-            {agent.empId || "no employee ID"} · {agent.email} · TL {agent.tl || "—"}
+            {agent.empId || "no employee ID"} · {agent.email || "no email on file"} · TL {agent.tl || "—"}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">

@@ -13,9 +13,7 @@ import {
 import { todayStr, daysBetween, addDays, monthOf, yearOf, consecutiveRun } from "./dates.js";
 import { deductionDaysOf, applyLaborLawCap, capNotes } from "./deductions.js";
 import { days, ordinal } from "./format.js";
-
-const norm = (s) => (s || "").trim().toLowerCase();
-const sameAgent = (e, email) => norm(e.email) === norm(email);
+import { toAgentRef, agentMatches, agentKeyOf, agentLabel } from "./identity.js";
 
 /** A case counts toward discipline only once a manager has escalated it.
     Pending-review cases are deliberately inert — that is the point of the
@@ -44,13 +42,13 @@ export function findRule(dcm, { id, name }) {
  * on day 0, day 80 and day 170 is on their 3rd occurrence — even though day 0
  * is 170 days back — because neither gap ever exceeded 90.
  */
-export function occurrenceFor(entries, email, violation, date, excludeId) {
+export function occurrenceFor(entries, agent, violation, date, excludeId) {
   const priors = entries
     .filter(
       (e) =>
         e.id !== excludeId &&
         e.violation === violation &&
-        sameAgent(e, email) &&
+        agentMatches(e, agent) &&
         countsForDiscipline(e) &&
         e.date &&
         e.date <= date
@@ -68,12 +66,12 @@ export function occurrenceFor(entries, email, violation, date, excludeId) {
 }
 
 /** Emergency-leave consumption for an agent, as of `date`. */
-export function emergencyUsage(entries, email, date, excludeId) {
+export function emergencyUsage(entries, agent, date, excludeId) {
   const rows = entries.filter(
     (e) =>
       e.id !== excludeId &&
       e.violation === "Emergency Leave" &&
-      sameAgent(e, email) &&
+      agentMatches(e, agent) &&
       e.stage !== "dismissed" &&
       e.date
   );
@@ -106,8 +104,8 @@ export function emergencyUsage(entries, email, date, excludeId) {
   };
 }
 
-function disciplinaryVerdict(rule, email, date, entries, dcm, excludeId) {
-  const { occ, lastPrior } = occurrenceFor(entries, email, rule.name, date, excludeId);
+function disciplinaryVerdict(rule, agent, date, entries, dcm, excludeId) {
+  const { occ, lastPrior } = occurrenceFor(entries, agent, rule.name, date, excludeId);
 
   // Walk back to the highest step the matrix actually defines.
   let step = Math.min(occ, 3);
@@ -115,7 +113,7 @@ function disciplinaryVerdict(rule, email, date, entries, dcm, excludeId) {
   const action = rule["a" + step];
   const executor = rule["e" + step] || "HR";
 
-  const cap = applyLaborLawCap(deductionDaysOf(action), { entries, email, date, excludeId });
+  const cap = applyLaborLawCap(deductionDaysOf(action), { entries, agent, date, excludeId });
 
   const notes = [];
   if (lastPrior) {
@@ -123,7 +121,7 @@ function disciplinaryVerdict(rule, email, date, entries, dcm, excludeId) {
       `Previous occurrence ${fmtGap(lastPrior, date)} — inside the ${RESET_DAYS}-day window, so the count advances. Dismissed cases are excluded.`
     );
   }
-  const pending = countPendingSame(entries, email, rule.name, date, excludeId);
+  const pending = countPendingSame(entries, agent, rule.name, date, excludeId);
   if (pending > 0) {
     notes.push(
       `${pending} earlier case${pending === 1 ? "" : "s"} of this violation still awaiting triage — not counted until escalated.`
@@ -163,12 +161,12 @@ function disciplinaryVerdict(rule, email, date, entries, dcm, excludeId) {
   };
 }
 
-function countPendingSame(entries, email, violation, date, excludeId) {
+function countPendingSame(entries, agent, violation, date, excludeId) {
   return entries.filter(
     (e) =>
       e.id !== excludeId &&
       e.violation === violation &&
-      sameAgent(e, email) &&
+      agentMatches(e, agent) &&
       e.stage === "review" &&
       e.date &&
       e.date <= date
@@ -186,21 +184,23 @@ const NO_CAP = applyLaborLawCap(0);
 /**
  * The verdict for one incident. Returns null when no violation is selected.
  *
- * `entries` is the whole ledger; `excludeId` omits an entry from its own
- * history when re-evaluating a case that is already logged.
+ * `agent` is a {email, empId} ref (a bare email string still works — the
+ * original API). `entries` is the whole ledger; `excludeId` omits an entry
+ * from its own history when re-evaluating a case that is already logged.
  */
-export function verdictFor(violation, email, date, entries, dcm, excludeId) {
+export function verdictFor(violation, agentRef, date, entries, dcm, excludeId) {
   if (!violation) return null;
+  const agent = toAgentRef(agentRef);
   const d = date || todayStr();
 
   // Emergency leave past the quota is not leave at all — the policy reclassifies
   // it as unauthorised absence, which means it runs through the matrix.
   if (violation === "Emergency Leave") {
-    const em = emergencyUsage(entries, email, d, excludeId);
+    const em = emergencyUsage(entries, agent, d, excludeId);
     if (em.exceeded) {
       const rule = findRule(dcm, { id: "absent", name: "Unauthorised absence" });
       if (rule) {
-        const v = disciplinaryVerdict(rule, email, d, entries, dcm, excludeId);
+        const v = disciplinaryVerdict(rule, agent, d, entries, dcm, excludeId);
         return { ...v, emergency: em, reclassifiedFrom: "Emergency Leave", notes: [em.reason, ...v.notes] };
       }
     }
@@ -221,7 +221,7 @@ export function verdictFor(violation, email, date, entries, dcm, excludeId) {
   }
 
   const rule = dcm.find((r) => r.name === violation);
-  if (rule) return disciplinaryVerdict(rule, email, d, entries, dcm, excludeId);
+  if (rule) return disciplinaryVerdict(rule, agent, d, entries, dcm, excludeId);
 
   // Everything else is approved / excused leave.
   const notes = [];
@@ -243,6 +243,54 @@ export function verdictFor(violation, email, date, entries, dcm, excludeId) {
   };
 }
 
+/**
+ * Rule on one or more cases: escalate ("active") or dismiss ("dismissed").
+ *
+ * The verdict stored at logging time is provisional — pending cases don't
+ * count toward occurrence chains, so it can go stale the moment history
+ * changes. Escalation is where the punitive outcome is finalized, so each
+ * escalated case is re-verdicted against the ledger *as it stands then*,
+ * processed oldest-first: bulk-escalating two NCNS from one RTA file
+ * correctly yields a 1st then a 2nd occurrence, not two 1sts.
+ *
+ * Pure: returns a new entries array. Callers re-settle deductions after.
+ */
+export function decideCases(entries, ids, stage, { by, assignee, comment }, dcm) {
+  const set = new Set(ids);
+  const targets = entries
+    .filter((e) => set.has(e.id))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.createdAt || 0) - (b.createdAt || 0));
+
+  let ledger = entries;
+  for (const t of targets) {
+    const next = {
+      ...t,
+      stage,
+      assignee: stage === "active" ? assignee : t.assignee,
+      activity: [
+        ...(t.activity || []),
+        { at: Date.now(), by, type: stage === "active" ? "escalated" : "dismissed", text: comment },
+      ],
+    };
+    if (stage === "active") {
+      const v = verdictFor(t.violation, { email: t.email, empId: t.empId }, t.date, ledger, dcm, t.id);
+      if (v) {
+        next.occurrence = v.occ;
+        next.action = v.action;
+        next.executor = v.executor;
+        next.severity = v.severity;
+        next.disciplinary = v.disciplinary;
+        next.deductionDays = v.cap.prescribed;
+        next.deductionApplied = v.cap.applied;
+        next.reclassifiedFrom = v.reclassifiedFrom || "";
+        next.hrNeeded = v.executor === "HR";
+      }
+    }
+    ledger = ledger.map((x) => (x.id === t.id ? next : x));
+  }
+  return ledger;
+}
+
 /* ── Systemic escalation thresholds ─────────────────────────────────────────
    These look across violations rather than at one rule, and fire on patterns
    the matrix alone would miss. */
@@ -253,12 +301,12 @@ export function computeEscalations(entries) {
   const byAgent = {};
 
   for (const e of live) {
-    const em = norm(e.email);
-    if (!em) continue;
-    if (!byAgent[em]) {
-      byAgent[em] = { email: e.email, account: e.account, in30: 0, in60: 0, ncns: [], emergency: 0 };
+    const key = agentKeyOf(e);
+    if (!key) continue;
+    if (!byAgent[key]) {
+      byAgent[key] = { email: agentLabel(e), account: e.account, in30: 0, in60: 0, ncns: [], emergency: 0 };
     }
-    const a = byAgent[em];
+    const a = byAgent[key];
     a.account = e.account;
     const age = daysBetween(e.date, today);
 
@@ -337,8 +385,8 @@ export function computeEscalations(entries) {
  * Kept in step with `monthDeductionUsed` in deductions.js — change both or
  * neither.
  */
-export function monthlyDeductionFor(entries, email, month) {
+export function monthlyDeductionFor(entries, agent, month) {
   return entries
-    .filter((e) => sameAgent(e, email) && e.stage !== "dismissed" && monthOf(e.date) === month)
+    .filter((e) => agentMatches(e, agent) && e.stage !== "dismissed" && monthOf(e.date) === month)
     .reduce((s, e) => s + (e.deductionApplied || 0), 0);
 }

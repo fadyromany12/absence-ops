@@ -13,9 +13,10 @@
      · youssef.hany  three infractions inside 30 days — trips the 3-in-30 flag
 */
 
-import { uid } from "./format.js";
+import { uid, nameFromEmail } from "./format.js";
 import { addDays, todayStr } from "./dates.js";
 import { verdictFor } from "./engine.js";
+import { LOBS } from "./constants.js";
 
 /** flow: how far through the pipeline the case has travelled. */
 const FLOWS = {
@@ -81,10 +82,16 @@ export function buildSamples(tls, dcm) {
     entries.push({
       id: uid(),
       account: r.acc,
+      lob: LOBS[i % LOBS.length],
       date,
       email: r.email,
       empId: r.id,
+      agentName: nameFromEmail(r.email),
       tl,
+      executorName: tl,
+      tardyMin: 0,
+      earlyMin: 0,
+      compMin: 0,
       shiftStart: r.s,
       shiftEnd: r.e,
       violation: r.v,

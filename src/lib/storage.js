@@ -7,6 +7,7 @@
 import { DEFAULTS, DATA_VERSION } from "./constants.js";
 import { DEFAULT_DCM } from "./dcm.js";
 import { settleDeductions } from "./deductions.js";
+import { seedUsers, ROLES } from "./auth.js";
 
 /** Violation names retired in v2. */
 const NAME_MAP = {
@@ -38,11 +39,26 @@ export function normalize(raw) {
     stage: e.stage || "active",
     assignee: e.assignee ?? (e.tl || ""),
     activity: Array.isArray(e.activity) ? e.activity : [],
+    // v4: RTA fields — earlier entries simply never had lost-time components
+    // or an LOB, so zero/blank is the truthful backfill.
+    lob: e.lob || "",
+    agentName: e.agentName || "",
+    executorName: e.executorName || "",
+    tardyMin: e.tardyMin || 0,
+    earlyMin: e.earlyMin || 0,
+    compMin: e.compMin || 0,
   }));
 
   // v3 introduced stored deduction days — replay the ledger so each entry gets
   // the cap it would have been given when it was logged.
   if (from < DATA_VERSION) base.entries = settleDeductions(base.entries);
+
+  // v4: users. Seed when absent so a fresh (or migrated) browser can log in;
+  // drop any stored user whose role no longer exists.
+  const users = (Array.isArray(stored.users) ? stored.users : []).filter(
+    (u) => u && u.id && u.email && ROLES.includes(u.role)
+  );
+  base.users = users.length ? users : seedUsers();
 
   return base;
 }
