@@ -1,0 +1,156 @@
+/* The signature element: what the matrix says, the moment the TL has typed
+   enough to say it. Occurrence number, prescribed action, what payroll may
+   actually deduct after the statutory caps, and the agent's rights. */
+
+import { Scale, ShieldAlert, ArrowRight, RefreshCw } from "lucide-react";
+import { Pill } from "./ui/index.jsx";
+import { P, sevColor } from "../lib/tokens.js";
+import { LAW_CITATION, PER_INCIDENT_CAP, PER_MONTH_CAP } from "../lib/constants.js";
+import { fmtDateLong, days } from "../lib/format.js";
+
+const INK_TEXT = "#F2F6F5";
+const INK_SOFT = "#B9C9C7";
+const INK_ACCENT = "#8FB6B3";
+
+export default function VerdictPanel({ verdict }) {
+  if (!verdict) return null;
+  const sev = verdict.severity ? sevColor(verdict.severity) : P.green;
+  const cap = verdict.cap || { prescribed: 0, applied: 0 };
+  const capped = cap.prescribed > cap.applied;
+
+  return (
+    <div style={{ background: P.ink, borderRadius: 8, overflow: "hidden" }}>
+      <div className="flex">
+        <div style={{ width: 6, background: sev, flexShrink: 0 }} />
+        <div className="p-4 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="ao-mono font-semibold" style={{ fontSize: 12, color: INK_ACCENT, letterSpacing: 1 }}>
+              {verdict.disciplinary ? `OCCURRENCE Nº ${verdict.occ}` : "EXCUSED / LEAVE"}
+            </span>
+            {verdict.severity && (
+              <Pill color={sev} filled>
+                {verdict.severity}
+              </Pill>
+            )}
+            <Pill color={INK_ACCENT}>Executor · {verdict.executor}</Pill>
+            {verdict.reclassifiedFrom && (
+              <Pill color={P.amber} filled title="Quota spent — the policy reclassifies this">
+                <RefreshCw size={10} className="mr-1" />
+                Reclassified from {verdict.reclassifiedFrom}
+              </Pill>
+            )}
+          </div>
+
+          <div className="ao-disp font-semibold mt-2" style={{ fontSize: 20, color: INK_TEXT, lineHeight: 1.2 }}>
+            {verdict.action}
+          </div>
+
+          {verdict.resetOn && verdict.disciplinary && (
+            <div className="ao-mono mt-1" style={{ fontSize: 11.5, color: INK_ACCENT }}>
+              Resets {fmtDateLong(verdict.resetOn)} if no recurrence
+            </div>
+          )}
+
+          {cap.prescribed > 0 && <DeductionBar cap={cap} capped={capped} />}
+
+          {verdict.notes.map((n, i) => (
+            <div key={i} className="mt-1" style={{ fontSize: 12.5, color: INK_SOFT }}>
+              • {n}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {verdict.investigation && <InvestigationBanner severity={verdict.severity} />}
+      {cap.prescribed > 0 && <LawStrip capped={capped} cap={cap} />}
+    </div>
+  );
+}
+
+/* Prescribed vs collectable, side by side — the gap is the point. */
+function DeductionBar({ cap, capped }) {
+  return (
+    <div
+      className="mt-3 p-3 flex items-center gap-3 flex-wrap"
+      style={{ background: "#1D3640", borderRadius: 6, border: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
+    >
+      <Scale size={16} color={capped ? P.amber : INK_ACCENT} />
+      <div>
+        <div className="ao-disp uppercase tracking-wider font-semibold" style={{ fontSize: 10, color: INK_ACCENT }}>
+          Matrix prescribes
+        </div>
+        <div className="ao-mono font-semibold" style={{ fontSize: 16, color: INK_TEXT }}>
+          {days(cap.prescribed)}
+        </div>
+      </div>
+
+      <ArrowRight size={16} color={INK_ACCENT} />
+
+      <div>
+        <div className="ao-disp uppercase tracking-wider font-semibold" style={{ fontSize: 10, color: INK_ACCENT }}>
+          Payroll may deduct
+        </div>
+        <div className="ao-mono font-semibold" style={{ fontSize: 16, color: capped ? P.amber : P.green }}>
+          {days(cap.applied)}
+        </div>
+      </div>
+
+      {capped && (
+        <>
+          <span className="flex-1" />
+          <Pill color={P.amber} filled>
+            Cap applied · {days(cap.waived)} waived
+          </Pill>
+        </>
+      )}
+
+      {!capped && cap.headroom < PER_MONTH_CAP && (
+        <>
+          <span className="flex-1" />
+          <span className="ao-mono" style={{ fontSize: 11.5, color: INK_ACCENT }}>
+            {cap.monthUsed} of {PER_MONTH_CAP} days used this month
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LawStrip({ capped, cap }) {
+  return (
+    <div
+      className="px-4 py-2 flex items-center gap-2"
+      style={{ background: capped ? "#3A2A16" : "#16303A", borderTop: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
+    >
+      <Scale size={13} color={capped ? P.amber : INK_ACCENT} />
+      <span style={{ fontSize: 11.5, color: capped ? "#F0D6A8" : INK_ACCENT }}>
+        {LAW_CITATION} — deductions capped at {PER_INCIDENT_CAP} days per incident and {PER_MONTH_CAP} days per calendar
+        month.
+        {capped && ` This incident is limited to ${days(cap.applied)}; ${days(cap.waived)} cannot be collected.`}
+      </span>
+    </div>
+  );
+}
+
+function InvestigationBanner({ severity }) {
+  const zt = severity === "Zero Tolerance";
+  return (
+    <div
+      className="px-4 py-3 flex items-start gap-2"
+      style={{ background: zt ? "#2A1614" : "#3A1F1A", borderTop: `1px solid ${P.brick}` }}
+    >
+      <ShieldAlert size={16} color="#E8A79C" style={{ flexShrink: 0, marginTop: 1 }} />
+      <div>
+        <div className="ao-disp uppercase tracking-wide font-semibold" style={{ fontSize: 12, color: "#F0C4BC" }}>
+          Investigation protocols active
+        </div>
+        <div className="mt-1" style={{ fontSize: 12, color: "#E0B5AD", lineHeight: 1.5 }}>
+          The employee must be notified in writing and holds the right to a <b>3–5 working day</b> written response
+          window and to have a colleague present during review. No deduction or termination may be executed before the
+          investigation concludes.
+          {zt && " Immediate suspension pending investigation may apply."}
+        </div>
+      </div>
+    </div>
+  );
+}

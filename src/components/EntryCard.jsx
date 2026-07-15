@@ -1,0 +1,306 @@
+/* One case, everywhere it appears: the log, the triage inbox and both approval
+   queues all render this. Which controls show depends on where the case has
+   reached in the TL → OPS → HR pipeline. */
+
+import { useState } from "react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus } from "lucide-react";
+import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
+import ReviewBox from "./ReviewBox.jsx";
+import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
+import { fmtMin, fmtDate, fmtStamp, days } from "../lib/format.js";
+import { todayStr } from "../lib/dates.js";
+import { statusOf } from "../lib/engine.js";
+import { PER_MONTH_CAP } from "../lib/constants.js";
+
+const ACTION_LABEL = {
+  escalated: "Escalated",
+  dismissed: "Dismissed",
+  comment: "Comment",
+  notified: "Agent notified",
+  ops: "Confirmed by OPS",
+  hr: "Approved by HR",
+  reopened: "Sent back to triage",
+};
+
+export default function EntryCard({ e, tls, onPatch, onDelete }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [hrRef, setHrRef] = useState(e.hrRef || "");
+
+  const st = statusOf(e);
+  const sev = e.severity ? sevColor(e.severity) : P.green;
+  const dimmed = e.stage === "dismissed";
+  const capped = (e.deductionDays || 0) > (e.deductionApplied || 0);
+
+  const log = (type, text, by = "") => ({ at: Date.now(), by, type, text });
+
+  /* Pipeline steps auto-stamp their own activity and action date. */
+  const advance = (key, type, text) => {
+    const next = { ...e, [key]: !e[key] };
+    const activity = [...(e.activity || [])];
+    if (next[key]) activity.push(log(type, text));
+    next.activity = activity;
+    if (next.opsConfirmed && !next.actionDate) next.actionDate = todayStr();
+    if (!next.opsConfirmed) next.actionDate = "";
+    onPatch(next);
+  };
+
+  const confirmHr = () => {
+    const ref = hrRef.trim();
+    if (!ref) return;
+    onPatch({
+      ...e,
+      hrConfirmed: true,
+      hrRef: ref,
+      actionDate: e.actionDate || todayStr(),
+      activity: [...(e.activity || []), log("hr", `HR case reference ${ref} — executed.`)],
+    });
+  };
+
+  const decide = (stage, by, assignee, text) => {
+    onPatch({
+      ...e,
+      stage,
+      assignee: stage === "active" ? assignee : e.assignee,
+      activity: [...(e.activity || []), log(stage === "active" ? "escalated" : "dismissed", text, by)],
+    });
+  };
+
+  const addComment = () => {
+    const t = newComment.trim();
+    if (!t) return;
+    onPatch({ ...e, activity: [...(e.activity || []), log("comment", t)] });
+    setNewComment("");
+  };
+
+  return (
+    <div
+      className="flex"
+      style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden", opacity: dimmed ? 0.7 : 1 }}
+    >
+      <div style={{ width: 5, background: dimmed ? "#B9C4C2" : sev, flexShrink: 0 }} />
+      <div className="p-3 flex-1 min-w-0">
+        {/* Identity + status */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="ao-mono font-medium truncate" style={{ fontSize: 13, color: P.ink, maxWidth: "60%" }}>
+            {e.email}
+          </span>
+          {e.empId && (
+            <span className="ao-mono" style={{ fontSize: 11, color: P.sub }}>
+              {e.empId}
+            </span>
+          )}
+          <span className="flex-1" />
+          <Pill color={STATUS_COLOR[st]} filled={st !== "Closed" && st !== "Dismissed"}>
+            {st}
+          </Pill>
+        </div>
+
+        {/* Violation line */}
+        <div className="flex items-center gap-2 flex-wrap mt-2">
+          <Pill color={dimmed ? "#8A9598" : sev} filled>
+            {e.violation}
+            {e.occurrence ? ` · №${e.occurrence}` : ""}
+          </Pill>
+          {e.reclassifiedFrom && <Pill color={P.amber}>from {e.reclassifiedFrom}</Pill>}
+          <span className="inline-flex items-center gap-1" style={{ fontSize: 12, color: P.sub }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: accColor(e.account), display: "inline-block" }} />
+            {e.account}
+          </span>
+          <span style={{ fontSize: 12, color: P.sub }}>{fmtDate(e.date)}</span>
+          <span className="ao-mono" style={{ fontSize: 12, color: P.sub }}>
+            {e.shiftStart}–{e.shiftEnd}
+          </span>
+          {e.missingMin > 0 && (
+            <span className="ao-mono" style={{ fontSize: 12, color: P.brick }}>
+              −{fmtMin(e.missingMin)}
+            </span>
+          )}
+        </div>
+
+        {/* Prescribed action */}
+        <div className="mt-2" style={{ fontSize: 13, color: P.inkSoft }}>
+          <span className="font-semibold">{e.action}</span>
+          <span style={{ color: P.sub }}>
+            {" "}
+            · {e.executor === "HR" ? "HR executes" : "TL executes"} · logged by {e.tl}
+          </span>
+          {e.sickNote && <span style={{ color: P.green }}> · certificate ✓</span>}
+          {e.actionDate && <span style={{ color: P.sub }}> · actioned {fmtDate(e.actionDate)}</span>}
+          {e.hrRef && (
+            <span className="ao-mono" style={{ color: P.sub }}>
+              {" "}
+              · {e.hrRef}
+            </span>
+          )}
+        </div>
+
+        {e.notes && (
+          <div className="mt-1 truncate" style={{ fontSize: 12, color: P.sub }}>
+            “{e.notes}”
+          </div>
+        )}
+
+        {/* Labour-law cap badge — only when the law actually bit */}
+        {capped && !dimmed && (
+          <div
+            className="mt-2 flex items-start gap-2 p-2"
+            style={{ background: "#FBF6F0", border: `1px solid ${P.amber}55`, borderRadius: 6 }}
+          >
+            <Scale size={13} color={P.amber} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span style={{ fontSize: 12, color: P.inkSoft }}>
+              <b>Labour law cap applied</b> — deductions limited to {PER_MONTH_CAP} days max per month. Prescribed{" "}
+              {days(e.deductionDays)}, collectable {days(e.deductionApplied || 0)}.
+            </span>
+          </div>
+        )}
+
+        {e.stage === "review" && <ReviewBox e={e} tls={tls} onDecide={decide} />}
+
+        {e.stage === "dismissed" &&
+          (e.activity || [])
+            .filter((a) => a.type === "dismissed")
+            .slice(-1)
+            .map((a, i) => (
+              <div key={i} className="mt-2 p-2" style={{ background: P.mist, borderRadius: 6, fontSize: 12.5, color: P.inkSoft }}>
+                Dismissed by <b>{a.by}</b>: {a.text}
+                <div className="ao-mono mt-1" style={{ fontSize: 11, color: P.sub }}>
+                  Archived {fmtStamp(a.at)} · excluded from metrics, hours lost and deductions
+                </div>
+              </div>
+            ))}
+
+        {/* Pipeline */}
+        {e.stage === "active" && (
+          <div className="flex items-center gap-2 flex-wrap mt-3">
+            <Toggle
+              on={e.notified}
+              label="Agent notified"
+              onClick={() => advance("notified", "notified", "Agent notified of the case in writing.")}
+            />
+            <Toggle
+              on={e.opsConfirmed}
+              label="OPS confirm"
+              disabledLook={!e.notified}
+              title={e.notified ? "" : "Notify the agent first"}
+              onClick={() => e.notified && advance("opsConfirmed", "ops", "Operations manager signed off.")}
+            />
+            {e.hrNeeded ? (
+              e.hrConfirmed ? (
+                <Toggle
+                  on
+                  label="HR confirm"
+                  onClick={() =>
+                    onPatch({ ...e, hrConfirmed: false, activity: [...(e.activity || []), log("comment", "HR confirmation withdrawn.")] })
+                  }
+                />
+              ) : (
+                <Toggle on={false} label="HR confirm" disabledLook title="Enter an HR case reference below" onClick={() => {}} />
+              )
+            ) : (
+              <Toggle
+                on={false}
+                label="HR n/a"
+                disabledLook
+                title="Mark this case as requiring HR"
+                onClick={() => onPatch({ ...e, hrNeeded: true })}
+              />
+            )}
+          </div>
+        )}
+
+        {/* HR execution gate */}
+        {e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && (
+          <div className="mt-3 p-3" style={{ background: "#FBF4F3", border: `1px dashed ${P.brick}66`, borderRadius: 8 }}>
+            <Label>HR case reference (required to complete)</Label>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              <TInput
+                placeholder="HR-2026-0142"
+                value={hrRef}
+                onChange={(ev) => setHrRef(ev.target.value)}
+                onKeyDown={(ev) => ev.key === "Enter" && confirmHr()}
+                style={{ maxWidth: 220 }}
+              />
+              <BtnPrimary bg={P.brick} onClick={confirmHr} disabled={!hrRef.trim()}>
+                Complete HR execution
+              </BtnPrimary>
+            </div>
+            {(e.deductionApplied || 0) > 0 && (
+              <div className="mt-2" style={{ fontSize: 12, color: P.sub }}>
+                Executes a <b>{e.deductionApplied}-day</b> deduction and the formal warning letter.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center gap-2 flex-wrap mt-3" style={{ borderTop: `1px solid ${P.mist}`, paddingTop: 8 }}>
+          {e.stage !== "review" && (
+            <span className="inline-flex items-center gap-1" style={{ fontSize: 12, color: P.sub }}>
+              Assignee
+              <select
+                value={e.assignee || ""}
+                onChange={(ev) => onPatch({ ...e, assignee: ev.target.value })}
+                style={{ fontSize: 12, color: P.ink, border: `1px solid ${P.line}`, borderRadius: 6, padding: "2px 6px", background: "#FBFCFB" }}
+              >
+                <option value="">Unassigned</option>
+                {tls.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </span>
+          )}
+          <button
+            onClick={() => setShowHistory((s) => !s)}
+            className="inline-flex items-center gap-1"
+            style={{ fontSize: 12, color: P.petrol, background: "none", border: "none", cursor: "pointer" }}
+          >
+            History ({(e.activity || []).length})
+            {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+          <span className="flex-1" />
+          <button
+            onClick={() => {
+              if (window.confirm("Delete this entry? This cannot be undone.")) onDelete(e.id);
+            }}
+            className="inline-flex items-center gap-1"
+            style={{ fontSize: 12, color: P.sub, background: "none", border: "none", cursor: "pointer" }}
+          >
+            <Trash2 size={12} />
+            Delete
+          </button>
+        </div>
+
+        {showHistory && (
+          <div className="mt-2 grid gap-1">
+            {(e.activity || []).length === 0 && <div style={{ fontSize: 12, color: P.sub }}>No activity yet.</div>}
+            {(e.activity || []).map((a, i) => (
+              <div key={i} style={{ fontSize: 12.5, color: P.inkSoft }}>
+                <span className="ao-mono" style={{ color: P.sub, fontSize: 11 }}>
+                  {fmtStamp(a.at)}
+                </span>
+                {" · "}
+                <b style={{ color: a.type === "dismissed" ? P.sub : a.type === "escalated" ? P.petrol : P.ink }}>
+                  {ACTION_LABEL[a.type] || a.type}
+                </b>
+                {a.by ? ` by ${a.by}` : ""} — {a.text}
+              </div>
+            ))}
+            <div className="flex gap-2 mt-1">
+              <TInput
+                placeholder="Add a comment…"
+                value={newComment}
+                onChange={(ev) => setNewComment(ev.target.value)}
+                onKeyDown={(ev) => ev.key === "Enter" && addComment()}
+                style={{ fontSize: 13, padding: "6px 8px" }}
+              />
+              <BtnGhost onClick={addComment} icon={MessageSquarePlus}>
+                Add
+              </BtnGhost>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,142 @@
+/* Shared primitives. Structural pattern follows shadcn/ui — small, unstyled-by-
+   default building blocks composed by feature components — but the styling is
+   the tracker's own Konecta palette rather than shadcn's theme. */
+
+import { Check } from "lucide-react";
+import { P } from "../../lib/tokens.js";
+
+export const Label = ({ children }) => (
+  <div className="ao-disp uppercase tracking-wider font-semibold" style={{ fontSize: 11, color: P.sub }}>
+    {children}
+  </div>
+);
+
+export const Field = ({ label, children, span }) => (
+  <div className={span ? "md:col-span-2" : ""}>
+    <Label>{label}</Label>
+    <div className="mt-1">{children}</div>
+  </div>
+);
+
+const inputStyle = {
+  border: `1px solid ${P.line}`,
+  background: "#FBFCFB",
+  color: P.ink,
+  borderRadius: 6,
+  padding: "8px 10px",
+  fontSize: 14,
+  width: "100%",
+};
+
+export const TInput = ({ style, ...props }) => <input {...props} style={{ ...inputStyle, ...style }} />;
+export const TSelect = ({ style, ...props }) => <select {...props} style={{ ...inputStyle, ...style }} />;
+export const TArea = ({ style, ...props }) => (
+  <textarea {...props} style={{ ...inputStyle, minHeight: 64, resize: "vertical", ...style }} />
+);
+
+export const Pill = ({ color, children, filled, title }) => (
+  <span
+    className="ao-disp uppercase tracking-wide font-semibold inline-flex items-center"
+    title={title}
+    style={{
+      fontSize: 11,
+      padding: "2px 8px",
+      borderRadius: 999,
+      color: filled ? "#fff" : color,
+      background: filled ? color : "transparent",
+      border: `1px solid ${color}`,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {children}
+  </span>
+);
+
+export const Toggle = ({ on, label, onClick, disabledLook, title }) => (
+  <button
+    onClick={onClick}
+    title={title}
+    className="ao-disp uppercase tracking-wide font-semibold transition inline-flex items-center gap-1"
+    style={{
+      fontSize: 11,
+      padding: "4px 10px",
+      borderRadius: 6,
+      cursor: "pointer",
+      color: on ? "#fff" : disabledLook ? "#9AA8AB" : P.sub,
+      background: on ? P.green : "transparent",
+      border: `1px ${disabledLook && !on ? "dashed" : "solid"} ${on ? P.green : P.line}`,
+    }}
+  >
+    {on && <Check size={12} strokeWidth={3} />}
+    {label}
+  </button>
+);
+
+export const BtnPrimary = ({ children, onClick, disabled, bg, title, icon: Icon }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className="ao-disp uppercase tracking-wider font-semibold transition inline-flex items-center gap-2"
+    style={{
+      fontSize: 13,
+      padding: "10px 18px",
+      borderRadius: 6,
+      color: "#fff",
+      background: disabled ? "#9AB5B4" : bg || P.petrol,
+      border: "none",
+      cursor: disabled ? "default" : "pointer",
+    }}
+  >
+    {Icon && <Icon size={14} />}
+    {children}
+  </button>
+);
+
+export const BtnGhost = ({ children, onClick, color, disabled, title, icon: Icon }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className="ao-disp uppercase tracking-wider font-semibold transition inline-flex items-center gap-2"
+    style={{
+      fontSize: 13,
+      padding: "10px 16px",
+      borderRadius: 6,
+      color: disabled ? "#9AA8AB" : color || P.inkSoft,
+      background: "transparent",
+      border: `1px solid ${P.line}`,
+      cursor: disabled ? "default" : "pointer",
+    }}
+  >
+    {Icon && <Icon size={14} />}
+    {children}
+  </button>
+);
+
+export const Card = ({ title, children, right, accent }) => (
+  <div className="p-4" style={{ background: P.card, border: `1px solid ${accent || P.line}`, borderRadius: 10 }}>
+    {(title || right) && (
+      <div className="flex items-center justify-between gap-2">
+        <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 13, color: P.sub }}>
+          {title}
+        </div>
+        {right}
+      </div>
+    )}
+    <div className={title || right ? "mt-3" : ""}>{children}</div>
+  </div>
+);
+
+export const SectionTitle = ({ children, count, tone }) => (
+  <div className="ao-disp font-bold uppercase tracking-wide mb-2 flex items-center gap-2" style={{ fontSize: 14, color: P.ink }}>
+    {children}
+    {count !== undefined && (
+      <span className="ao-mono" style={{ color: tone || P.petrol }}>
+        ({count})
+      </span>
+    )}
+  </div>
+);
+
+export const Muted = ({ children }) => <div style={{ fontSize: 13, color: P.sub }}>{children}</div>;
