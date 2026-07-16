@@ -1,0 +1,9 @@
+# The local dev database cluster — hundreds of files, never deploys.
+.pgdata
+
+# Local-only tooling
+scripts/devdb.mjs
+test
+
+.next
+node_modules

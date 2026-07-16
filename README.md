@@ -66,6 +66,43 @@ RTA import / manual log ─► Pending Review ─► Escalated ─► OPS confir
 - **Digital acknowledgement** — write-once: a signed case can never be re-signed, ownership is
   enforced by employee ID/email, and the signature lands in the audit log in the same transaction.
 
+## Deploying
+
+The app is a standard Next.js server app plus a Postgres database. It needs two environment
+variables in the hosting platform:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string — use the **pooled** endpoint on serverless |
+| `AUTH_SECRET` | `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
+
+`npm run build` runs `prisma generate` before `next build`, because hosts cache `node_modules` and
+would otherwise ship a stale or missing client. The Prisma pool is capped small on serverless
+(`src/lib/prisma.ts`) — many warm instances each holding a large pool is how a Postgres runs out of
+connections.
+
+### Vercel + a marketplace Postgres
+
+```bash
+vercel login
+vercel link                       # create/link the project
+
+# In the Vercel dashboard: Storage → Marketplace → Neon (or Supabase) → connect
+# to this project. DATABASE_URL is injected automatically.
+
+vercel env add AUTH_SECRET production   # paste a generated secret
+
+vercel env pull .env.production.local   # get the cloud DATABASE_URL locally
+# then, against the cloud database:
+DATABASE_URL="<pooled-url>" npm run db:push
+DATABASE_URL="<pooled-url>" npm run db:seed
+
+vercel deploy --prod
+```
+
+Seeding is a deliberate one-off: it **wipes every table** and rebuilds the demo baseline, so never
+point it at a database holding real cases.
+
 ## Layout
 
 ```
