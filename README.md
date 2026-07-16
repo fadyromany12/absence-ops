@@ -1,5 +1,7 @@
 # Absence Ops
 
+**Live demo:** https://absence-ops.vercel.app — every account below signs in with `Welcome@123`.
+
 Full-stack BPO workforce & compliance for Konecta GDC accounts (Lenovo, Hertz, Beko): daily absence
 logging, RTA bulk imports, a rule-driven Disciplinary Consequences Matrix, multi-tier approvals with
 Egyptian-labour-law deduction capping, an append-only audit log — and an agent self-service portal
@@ -80,6 +82,9 @@ variables in the hosting platform:
 would otherwise ship a stale or missing client. The Prisma pool is capped small on serverless
 (`src/lib/prisma.ts`) — many warm instances each holding a large pool is how a Postgres runs out of
 connections.
+
+The production instance runs on Vercel with a Neon (marketplace) Postgres — deployed exactly by the
+steps below.
 
 ### Vercel + a marketplace Postgres
 

@@ -9,3 +9,5 @@ next-env.d.ts
 # secrets & local database — never commit these
 .env
 .pgdata
+
+.vercel
