@@ -1,0 +1,178 @@
+"use client";
+
+/* Tab H — the audit trail, finally visible.
+
+   Every state change in the system writes an immutable row; this view is the
+   read side: a reverse-chronological stream with action filtering and free-
+   text search. Nothing here mutates — the API has no write surface for it. */
+
+import { useEffect, useMemo, useState } from "react";
+import { ScrollText, Search, RefreshCw, Signature, Gavel, UploadCloud, UserCog, KeyRound, Settings2, Table2, Trash2, ClipboardPlus, Pencil, Bomb } from "lucide-react";
+import { Card, Pill, Muted, BtnGhost } from "./ui/index.jsx";
+import { P } from "../lib/tokens.js";
+import { fmtStamp, plural } from "../lib/format.js";
+import { ROLE_LABEL } from "../lib/auth.js";
+
+/* Every action the API writes, with a color and an icon so the stream scans. */
+const ACTIONS = {
+  CASE_CREATED: { label: "Logged", color: P.petrol, icon: ClipboardPlus },
+  CASE_DECIDED: { label: "Decided", color: P.amber, icon: Gavel },
+  CASE_UPDATED: { label: "Updated", color: P.sub, icon: Pencil },
+  CASE_DELETED: { label: "Deleted", color: P.brick, icon: Trash2 },
+  CASE_ACKNOWLEDGED: { label: "Signed", color: "#A78BFA", icon: Signature },
+  RTA_IMPORTED: { label: "RTA import", color: P.petrol, icon: UploadCloud },
+  DCM_UPDATED: { label: "Matrix", color: P.amber, icon: Table2 },
+  CONFIG_UPDATED: { label: "Config", color: P.sub, icon: Settings2 },
+  USER_CREATED: { label: "User +", color: P.green, icon: UserCog },
+  USER_UPDATED: { label: "User Δ", color: P.sub, icon: UserCog },
+  USER_DELETED: { label: "User −", color: P.brick, icon: UserCog },
+  USER_PASSWORD_CHANGED: { label: "Password", color: P.sub, icon: KeyRound },
+  FACTORY_RESET: { label: "Reset", color: P.brick, icon: Bomb },
+};
+
+export default function AuditTrail() {
+  const [rows, setRows] = useState(null); // null = loading
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [action, setAction] = useState("All");
+
+  const load = async () => {
+    setError("");
+    try {
+      const res = await fetch("/api/audit?limit=500");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not load the audit log.");
+      setRows(json.audit);
+    } catch (err) {
+      setError(err.message);
+      setRows([]);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const visible = useMemo(() => {
+    if (!rows) return [];
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (action !== "All" && r.action !== action) return false;
+      if (!needle) return true;
+      return (
+        r.summary.toLowerCase().includes(needle) ||
+        r.actorName.toLowerCase().includes(needle) ||
+        (r.caseId || "").toLowerCase().includes(needle)
+      );
+    });
+  }, [rows, q, action]);
+
+  const presentActions = useMemo(() => (rows ? [...new Set(rows.map((r) => r.action))] : []), [rows]);
+
+  return (
+    <Card
+      title={
+        <span className="inline-flex items-center gap-2">
+          <ScrollText size={14} />
+          Audit trail — append-only
+        </span>
+      }
+      right={
+        <div className="flex items-center gap-2">
+          {rows && (
+            <span className="ao-mono" style={{ fontSize: 11, color: P.sub }}>
+              {plural(visible.length, "event")}
+            </span>
+          )}
+          <BtnGhost onClick={load} icon={RefreshCw}>
+            Refresh
+          </BtnGhost>
+        </div>
+      }
+    >
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <div
+          className="flex items-center gap-2"
+          style={{ border: `1px solid ${P.line}`, background: "rgba(255,255,255,0.05)", borderRadius: 999, padding: "5px 12px", width: 240 }}
+        >
+          <Search size={13} color={P.sub} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Actor, summary, case id…"
+            style={{ border: "none", background: "transparent", outline: "none", fontSize: 12.5, color: P.ink, flex: 1, minWidth: 0 }}
+          />
+        </div>
+        <button
+          onClick={() => setAction("All")}
+          className="ao-disp uppercase tracking-wide font-semibold"
+          style={{
+            fontSize: 11, padding: "3px 10px", borderRadius: 999, cursor: "pointer",
+            border: `1px solid ${action === "All" ? P.petrol : P.line}`,
+            color: action === "All" ? "#fff" : P.sub,
+            background: action === "All" ? P.petrol : "transparent",
+          }}
+        >
+          All
+        </button>
+        {presentActions.map((a) => {
+          const meta = ACTIONS[a] || { label: a, color: P.sub };
+          const on = action === a;
+          return (
+            <button
+              key={a}
+              onClick={() => setAction(on ? "All" : a)}
+              className="ao-disp uppercase tracking-wide font-semibold"
+              style={{
+                fontSize: 11, padding: "3px 10px", borderRadius: 999, cursor: "pointer",
+                border: `1px solid ${on ? meta.color : P.line}`,
+                color: on ? "#06121A" : meta.color,
+                background: on ? meta.color : "transparent",
+              }}
+            >
+              {meta.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div style={{ fontSize: 13, color: P.brick }} role="alert">
+          {error}
+        </div>
+      )}
+      {rows === null && <Muted>Loading the trail…</Muted>}
+      {rows !== null && !error && visible.length === 0 && <Muted>No events match.</Muted>}
+
+      <div className="grid gap-1.5">
+        {visible.map((r) => {
+          const meta = ACTIONS[r.action] || { label: r.action, color: P.sub, icon: ScrollText };
+          const Icon = meta.icon;
+          return (
+            <div
+              key={r.id}
+              className="flex items-start gap-3 p-2.5 ao-lift"
+              style={{ background: P.mist, borderRadius: 10, borderLeft: `3px solid ${meta.color}` }}
+            >
+              <Icon size={14} color={meta.color} style={{ flexShrink: 0, marginTop: 2 }} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Pill color={meta.color}>{meta.label}</Pill>
+                  <span style={{ fontSize: 12.5, color: P.ink, fontWeight: 500 }}>{r.actorName}</span>
+                  <span style={{ fontSize: 11, color: P.sub }}>{ROLE_LABEL[r.actorRole] || r.actorRole}</span>
+                  <span className="flex-1" />
+                  <span className="ao-mono" style={{ fontSize: 11, color: P.sub, whiteSpace: "nowrap" }}>
+                    {fmtStamp(r.at)}
+                  </span>
+                </div>
+                <div className="mt-0.5" style={{ fontSize: 12.5, color: P.inkSoft, overflowWrap: "anywhere" }}>
+                  {r.summary}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}

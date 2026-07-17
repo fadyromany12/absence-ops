@@ -27,7 +27,7 @@ export default function ReviewBox({ e, tls, onDecide }) {
       : "";
 
   return (
-    <div className="mt-3 p-3" style={{ background: "#F3F7F6", border: `1px dashed ${P.petrol}66`, borderRadius: 8 }}>
+    <div className="mt-3 p-3" style={{ background: "rgba(52,179,168,0.10)", border: `1px dashed ${P.petrol}66`, borderRadius: 8 }}>
       <div className="ao-disp uppercase tracking-wide font-semibold flex items-center gap-1.5" style={{ fontSize: 12, color: P.petrol }}>
         <ShieldCheck size={13} />
         Manager review required

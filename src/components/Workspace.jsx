@@ -20,6 +20,7 @@ import {
   Table2,
   UserCog,
   Settings2,
+  ScrollText,
   Clock3,
   Scale,
   TriangleAlert,
@@ -48,6 +49,7 @@ import AgentProfiles from "./AgentProfiles.jsx";
 import DcmEditor from "./DcmEditor.jsx";
 import UserManagement from "./UserManagement.jsx";
 import SettingsView from "./SettingsView.jsx";
+import AuditTrail from "./AuditTrail.jsx";
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -56,6 +58,7 @@ const NAV = [
   { id: "triage", label: "Triage gate", icon: Inbox, badge: "review" },
   { id: "approvals", label: "Approvals", icon: CheckCheck, badge: "approvals" },
   { id: "agents", label: "Agents", icon: Users },
+  { id: "audit", label: "Audit trail", icon: ScrollText },
   { id: "dcm", label: "DCM matrix", icon: Table2 },
   { id: "users", label: "Users", icon: UserCog },
   { id: "settings", label: "Settings", icon: Settings2 },
@@ -65,7 +68,9 @@ export default function Workspace({ initial, me }) {
   const {
     data,
     error,
+    notice,
     clearError,
+    clearNotice,
     addEntry,
     commitRta,
     patchEntry,
@@ -94,6 +99,13 @@ export default function Workspace({ initial, me }) {
   useEffect(() => {
     if (!allowedTabs.includes(tab)) setTab(allowedTabs[0] || "dashboard");
   }, [me.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Success toasts hang around briefly, then leave on their own.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(clearNotice, 3800);
+    return () => clearTimeout(t);
+  }, [notice, clearNotice]);
 
   /* ── Derived views ─────────────────────────────────────────────────────── */
 
@@ -173,8 +185,11 @@ export default function Workspace({ initial, me }) {
 
   return (
     <div className="ao-body" style={{ minHeight: "100vh", background: P.paper, color: P.ink }}>
-      {/* ── Header band ── */}
-      <header style={{ background: P.ink }}>
+      {/* ── Header band — sticky glass over the aurora ── */}
+      <header
+        className="ao-glass"
+        style={{ background: "rgba(6,12,20,0.65)", borderBottom: `1px solid ${P.line}`, position: "sticky", top: 0, zIndex: 40 }}
+      >
         <div className="mx-auto px-4 py-4" style={{ maxWidth: 1320 }}>
           <div className="flex items-center gap-3 flex-wrap">
             <div style={{ width: 30, height: 30, background: P.petrol, borderRadius: 6, position: "relative", flexShrink: 0 }}>
@@ -203,9 +218,9 @@ export default function Workspace({ initial, me }) {
                   padding: "5px 12px",
                   borderRadius: 999,
                   cursor: "pointer",
-                  color: acc === a ? P.ink : "#C9D6D4",
-                  background: acc === a ? "#F2F6F5" : "transparent",
-                  border: `1px solid ${acc === a ? "#F2F6F5" : "#3A545C"}`,
+                  color: acc === a ? "#06121A" : "#C9D6D4",
+                  background: acc === a ? "#E9F1F0" : "transparent",
+                  border: `1px solid ${acc === a ? "#E9F1F0" : "#3A545C"}`,
                 }}
               >
                 {a !== "All" && (
@@ -234,7 +249,7 @@ export default function Workspace({ initial, me }) {
         <div className="mx-auto px-4" style={{ maxWidth: 1320 }}>
           <div
             className="flex items-center gap-2 mt-3 p-3"
-            style={{ background: "#FBF4F3", border: `1px solid ${P.brick}66`, borderRadius: 8 }}
+            style={{ background: "rgba(236,111,93,0.10)", border: `1px solid ${P.brick}66`, borderRadius: 8 }}
             role="alert"
           >
             <CircleAlert size={15} color={P.brick} style={{ flexShrink: 0 }} />
@@ -247,8 +262,8 @@ export default function Workspace({ initial, me }) {
       )}
 
       <div className="mx-auto px-4 pb-16 flex gap-5 items-start" style={{ maxWidth: 1320 }}>
-        {/* ── Sidebar ── */}
-        <nav className="hidden md:block py-4" style={{ width: 190, flexShrink: 0, position: "sticky", top: 0 }}>
+        {/* ── Sidebar (sticks below the glass header) ── */}
+        <nav className="hidden md:block py-4" style={{ width: 190, flexShrink: 0, position: "sticky", top: 118 }}>
           <div className="grid gap-1">
             {nav.map((n) => (
               <NavItem key={n.id} item={n} active={tab === n.id} badge={badges[n.badge] || 0} onClick={() => setTab(n.id)} />
@@ -300,7 +315,8 @@ export default function Workspace({ initial, me }) {
             </div>
           )}
 
-          <div className="mt-4">
+          {/* key={tab}: remount on tab change so the entrance animation replays */}
+          <div className="mt-4 ao-rise" key={tab}>
             {showEmpty ? (
               <EmptyState
                 canLog={can(me, "log")}
@@ -360,7 +376,7 @@ export default function Workspace({ initial, me }) {
                       <select
                         value={assigneeFilter}
                         onChange={(e) => setAssigneeFilter(e.target.value)}
-                        style={{ fontSize: 12, color: P.inkSoft, border: `1px solid ${P.line}`, borderRadius: 999, padding: "3px 8px", background: "#FBFCFB" }}
+                        style={{ fontSize: 12, color: P.inkSoft, border: `1px solid ${P.line}`, borderRadius: 999, padding: "3px 8px", background: "rgba(255,255,255,0.05)" }}
                       >
                         <option>All</option>
                         <option>Unassigned</option>
@@ -432,6 +448,8 @@ export default function Workspace({ initial, me }) {
 
             {tab === "agents" && !empty && <AgentProfiles entries={data.entries} accounts={data.accounts} />}
 
+            {tab === "audit" && can(me, "audit") && <AuditTrail />}
+
             {tab === "dcm" && can(me, "admin") && <DcmEditor dcm={data.dcm} onChange={setDcm} />}
 
             {tab === "users" && can(me, "admin") && (
@@ -458,6 +476,32 @@ export default function Workspace({ initial, me }) {
           </div>
         </main>
       </div>
+
+      {/* Success toast — bottom right, self-dismissing */}
+      {notice && (
+        <div
+          className="ao-pop ao-glass fixed bottom-5 right-5 z-50 flex items-center gap-2.5"
+          style={{
+            background: "rgba(10,24,22,0.85)",
+            border: `1px solid ${P.green}55`,
+            borderRadius: 12,
+            padding: "12px 16px",
+            maxWidth: 380,
+            boxShadow: `0 12px 40px rgba(2,6,23,0.6), 0 0 24px -8px ${P.green}66`,
+          }}
+          role="status"
+        >
+          <CircleCheck size={16} color={P.green} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: P.inkSoft }}>{notice}</span>
+          <button
+            onClick={clearNotice}
+            aria-label="Dismiss"
+            style={{ border: "none", background: "none", cursor: "pointer", color: P.sub, display: "flex", marginLeft: 4 }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -508,7 +552,7 @@ function NavItem({ item, active, badge, onClick }) {
       <Icon size={15} color={active ? P.petrol : P.sub} />
       <span className="flex-1">{item.label}</span>
       {badge > 0 && (
-        <span className="ao-mono" style={{ fontSize: 10.5, background: P.brick, color: "#fff", borderRadius: 999, padding: "1px 6px" }}>
+        <span className="ao-mono ao-pulse" style={{ fontSize: 10.5, background: P.brick, color: "#fff", borderRadius: 999, padding: "1px 6px" }}>
           {badge}
         </span>
       )}
@@ -551,8 +595,8 @@ function KPI({ label, value, icon: Icon, tone, onClick }) {
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
-      className="p-3"
-      style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 10, cursor: onClick ? "pointer" : "default" }}
+      className={onClick ? "p-3 ao-glass ao-lift" : "p-3 ao-glass"}
+      style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 12, cursor: onClick ? "pointer" : "default" }}
     >
       <div className="flex items-center gap-2">
         <Icon size={13} color={tone || P.sub} />

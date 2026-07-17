@@ -7,8 +7,9 @@ import { useMemo } from "react";
 import { PhoneCall, UserX, CalendarX2, Users, TriangleAlert, Scale } from "lucide-react";
 import { Card, Pill, Muted } from "./ui/index.jsx";
 import { P, SEV_ORDER, accColor, sevColor } from "../lib/tokens.js";
-import { fmtMin, days } from "../lib/format.js";
+import { fmtMin, fmtDate, days } from "../lib/format.js";
 import { countsForDiscipline } from "../lib/engine.js";
+import { todayStr, addDays, daysBetween } from "../lib/dates.js";
 
 const FLAG_ICON = { "3in30": PhoneCall, "5in60": Users, ncns: UserX, emergency: CalendarX2 };
 
@@ -30,6 +31,25 @@ export default function Dashboard({ entries, accounts, escalations }) {
     [live, escalated, accounts]
   );
   const maxMin = Math.max(1, ...perAccount.map((p) => p.min));
+
+  // Eight ISO-ish weeks back from today (bucket 0 = the current 7 days).
+  const weekly = useMemo(() => {
+    const today = todayStr();
+    const buckets = Array.from({ length: 8 }, (_, i) => ({
+      start: addDays(today, -7 * (8 - i) + 1),
+      end: addDays(today, -7 * (7 - i)),
+      min: 0,
+      count: 0,
+    }));
+    for (const e of live) {
+      const age = daysBetween(e.date, today);
+      if (Number.isNaN(age) || age < 0 || age >= 56) continue;
+      const idx = 7 - Math.floor(age / 7);
+      buckets[idx].min += e.missingMin || 0;
+      buckets[idx].count++;
+    }
+    return buckets;
+  }, [live]);
 
   const perLob = useMemo(() => {
     const m = {};
@@ -109,7 +129,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
                 <div
                   key={i}
                   className="flex items-start gap-2 p-2.5"
-                  style={{ background: "#FBF6F0", border: `1px solid ${c}33`, borderLeft: `4px solid ${c}`, borderRadius: 6 }}
+                  style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${c}33`, borderLeft: `4px solid ${c}`, borderRadius: 6 }}
                 >
                   <Icon size={15} color={c} style={{ flexShrink: 0, marginTop: 2 }} />
                   <div className="min-w-0">
@@ -126,6 +146,11 @@ export default function Dashboard({ entries, accounts, escalations }) {
             })}
           </div>
         )}
+      </Card>
+
+      {/* Trend: hours lost per week, last 8 weeks */}
+      <Card title="Hours lost — last 8 weeks" right={<Pill color={P.sub}>weekly</Pill>}>
+        <TrendBars weekly={weekly} />
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -253,6 +278,64 @@ export default function Dashboard({ entries, accounts, escalations }) {
           )}
         </Card>
       </div>
+    </div>
+  );
+}
+
+/* Eight weeks of lost time as glowing bars — pure SVG, no chart library. */
+function TrendBars({ weekly }) {
+  const max = Math.max(1, ...weekly.map((w) => w.min));
+  const W = 720;
+  const H = 150;
+  const pad = 8;
+  const bw = (W - pad * 2) / weekly.length;
+
+  if (weekly.every((w) => w.count === 0)) {
+    return <Muted>No lost time recorded in the last eight weeks.</Muted>;
+  }
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg viewBox={`0 0 ${W} ${H + 30}`} style={{ width: "100%", minWidth: 480 }} role="img" aria-label="Hours lost per week, last 8 weeks">
+        <defs>
+          <linearGradient id="trendbar" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#34B3A8" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="#34B3A8" stopOpacity="0.25" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map((f) => (
+          <line key={f} x1={pad} x2={W - pad} y1={H - H * f} y2={H - H * f} stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+        ))}
+        {weekly.map((w, i) => {
+          const h = Math.max(w.min > 0 ? 4 : 0, (w.min / max) * (H - 12));
+          const x = pad + i * bw + bw * 0.18;
+          const isCurrent = i === weekly.length - 1;
+          return (
+            <g key={w.start}>
+              <rect
+                x={x}
+                y={H - h}
+                width={bw * 0.64}
+                height={h}
+                rx="6"
+                fill={isCurrent ? "url(#trendbar)" : "rgba(255,255,255,0.14)"}
+                stroke={isCurrent ? "#34B3A8" : "rgba(255,255,255,0.18)"}
+                strokeWidth="1"
+              >
+                <title>{`${fmtDate(w.start)} – ${fmtDate(w.end)}: ${fmtMin(w.min)} lost across ${w.count} case${w.count === 1 ? "" : "s"}`}</title>
+              </rect>
+              {w.min > 0 && (
+                <text x={x + bw * 0.32} y={H - h - 6} textAnchor="middle" className="ao-mono" style={{ fontSize: 11, fill: isCurrent ? "#34B3A8" : "#8FA6A9" }}>
+                  {fmtMin(w.min)}
+                </text>
+              )}
+              <text x={x + bw * 0.32} y={H + 18} textAnchor="middle" className="ao-mono" style={{ fontSize: 10, fill: "#8FA6A9" }}>
+                {fmtDate(w.end)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }

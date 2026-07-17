@@ -79,10 +79,10 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
 
   return (
     <div
-      className="flex"
+      className="flex ao-glass"
       style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden", opacity: dimmed ? 0.7 : 1 }}
     >
-      <div style={{ width: 5, background: dimmed ? "#B9C4C2" : sev, flexShrink: 0 }} />
+      <div style={{ width: 5, background: dimmed ? "#546468" : sev, flexShrink: 0 }} />
       <div className="p-3 flex-1 min-w-0">
         {/* Identity + status */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -163,7 +163,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
         {capped && !dimmed && (
           <div
             className="mt-2 flex items-start gap-2 p-2"
-            style={{ background: "#FBF6F0", border: `1px solid ${P.amber}55`, borderRadius: 6 }}
+            style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${P.amber}55`, borderRadius: 6 }}
           >
             <Scale size={13} color={P.amber} style={{ flexShrink: 0, marginTop: 2 }} />
             <span style={{ fontSize: 12, color: P.inkSoft }}>
@@ -242,7 +242,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
 
         {/* HR execution gate */}
         {e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && can(me, "hr") && (
-          <div className="mt-3 p-3" style={{ background: "#FBF4F3", border: `1px dashed ${P.brick}66`, borderRadius: 8 }}>
+          <div className="mt-3 p-3" style={{ background: "rgba(236,111,93,0.10)", border: `1px dashed ${P.brick}66`, borderRadius: 8 }}>
             <Label>HR case reference (required to complete)</Label>
             <div className="flex gap-2 mt-1 flex-wrap">
               <TInput
@@ -273,7 +273,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
                 <select
                   value={e.assignee || ""}
                   onChange={(ev) => onPatch({ ...e, assignee: ev.target.value })}
-                  style={{ fontSize: 12, color: P.ink, border: `1px solid ${P.line}`, borderRadius: 6, padding: "2px 6px", background: "#FBFCFB" }}
+                  style={{ fontSize: 12, color: P.ink, border: `1px solid ${P.line}`, borderRadius: 6, padding: "2px 6px", background: "rgba(255,255,255,0.05)" }}
                 >
                   <option value="">Unassigned</option>
                   {tls.map((t) => (

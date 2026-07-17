@@ -19,7 +19,7 @@ export default function VerdictPanel({ verdict }) {
   const capped = cap.prescribed > cap.applied;
 
   return (
-    <div style={{ background: P.ink, borderRadius: 8, overflow: "hidden" }}>
+    <div className="ao-glass" style={{ background: P.deep, borderRadius: 10, overflow: "hidden", border: `1px solid ${P.line}` }}>
       <div className="flex">
         <div style={{ width: 6, background: sev, flexShrink: 0 }} />
         <div className="p-4 flex-1 min-w-0">
@@ -72,7 +72,7 @@ function DeductionBar({ cap, capped }) {
   return (
     <div
       className="mt-3 p-3 flex items-center gap-3 flex-wrap"
-      style={{ background: "#1D3640", borderRadius: 6, border: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
+      style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6, border: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
     >
       <Scale size={16} color={capped ? P.amber : INK_ACCENT} />
       <div>

@@ -32,7 +32,7 @@ function ListEditor({ title, items, onChange, placeholder }) {
                 height: 18,
                 borderRadius: 999,
                 border: "none",
-                background: "#CBD6D3",
+                background: "rgba(255,255,255,0.18)",
                 color: P.ink,
                 cursor: "pointer",
                 fontSize: 11,

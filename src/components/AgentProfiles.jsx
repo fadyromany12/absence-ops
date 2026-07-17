@@ -53,7 +53,7 @@ export default function AgentProfiles({ entries, accounts }) {
         <Card>
           <div
             className="flex items-center gap-2"
-            style={{ border: `1px solid ${P.line}`, background: "#FBFCFB", borderRadius: 6, padding: "8px 10px" }}
+            style={{ border: `1px solid ${P.line}`, background: "rgba(255,255,255,0.05)", borderRadius: 6, padding: "8px 10px" }}
           >
             <Search size={14} color={P.sub} />
             <input
@@ -98,10 +98,10 @@ export default function AgentProfiles({ entries, accounts }) {
               <button
                 key={a.key}
                 onClick={() => setSelected(a.key)}
-                className="text-left p-3 flex"
+                className="text-left p-3 flex ao-glass ao-lift"
                 style={{
-                  background: on ? P.ink : P.card,
-                  border: `1px solid ${on ? P.ink : P.line}`,
+                  background: on ? "rgba(52,179,168,0.16)" : P.card,
+                  border: `1px solid ${on ? P.petrol : P.line}`,
                   borderRadius: 8,
                   cursor: "pointer",
                 }}
@@ -151,7 +151,7 @@ function Profile({ agent, entries }) {
   return (
     <>
       {/* Header */}
-      <div className="flex" style={{ background: P.ink, borderRadius: 10, overflow: "hidden" }}>
+      <div className="flex ao-glass ao-rise" style={{ background: P.deep, borderRadius: 12, overflow: "hidden", border: `1px solid ${P.line}` }}>
         <div style={{ width: 6, background: accColor(agent.account), flexShrink: 0 }} />
         <div className="p-4 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -206,7 +206,7 @@ function Profile({ agent, entries }) {
           </div>
         )}
         {capHit && (
-          <div className="mt-3 flex items-start gap-2 p-2" style={{ background: "#FBF6F0", border: `1px solid ${P.amber}55`, borderRadius: 6 }}>
+          <div className="mt-3 flex items-start gap-2 p-2" style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${P.amber}55`, borderRadius: 6 }}>
             <Scale size={13} color={P.amber} style={{ flexShrink: 0, marginTop: 2 }} />
             <span style={{ fontSize: 12, color: P.inkSoft }}>
               Monthly deduction cap reached — {days(s.monthDeduction)} taken. Further deductions this month are not
@@ -238,7 +238,7 @@ function Profile({ agent, entries }) {
 function TimelineRow({ e }) {
   const st = statusOf(e);
   const dismissed = e.stage === "dismissed";
-  const dot = dismissed ? "#B9C4C2" : e.severity ? sevColor(e.severity) : P.green;
+  const dot = dismissed ? "#546468" : e.severity ? sevColor(e.severity) : P.green;
   const review = (e.activity || []).find((a) => a.type === "escalated" || a.type === "dismissed");
 
   return (
@@ -317,7 +317,7 @@ function TimelineRow({ e }) {
 
 function HeadStat({ label, value, tone }) {
   return (
-    <div className="p-2" style={{ background: "#1D3640", borderRadius: 6 }}>
+    <div className="p-2" style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6 }}>
       <div className="ao-mono font-semibold" style={{ fontSize: 16, color: tone || "#F2F6F5", lineHeight: 1.2 }}>
         {value}
       </div>

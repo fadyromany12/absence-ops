@@ -51,7 +51,7 @@ export default function DcmEditor({ dcm, onChange }) {
       <div className="flex items-center gap-2 mt-3" style={{ maxWidth: 320 }}>
         <div
           className="flex items-center gap-2 flex-1"
-          style={{ border: `1px solid ${P.line}`, background: "#FBFCFB", borderRadius: 6, padding: "6px 10px" }}
+          style={{ border: `1px solid ${P.line}`, background: "rgba(255,255,255,0.05)", borderRadius: 6, padding: "6px 10px" }}
         >
           <Search size={14} color={P.sub} />
           <input
@@ -91,7 +91,7 @@ export default function DcmEditor({ dcm, onChange }) {
               {rules.map((r) => (
                 <div
                   key={r.id}
-                  className="flex"
+                  className="flex ao-glass"
                   style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 10, overflow: "hidden" }}
                 >
                   <div style={{ width: 5, background: sevColor(r.severity), flexShrink: 0 }} />

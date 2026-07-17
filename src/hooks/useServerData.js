@@ -13,6 +13,7 @@ import { useCallback, useRef, useState } from "react";
 export function useServerData(initial) {
   const [data, setData] = useState(initial);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState(""); // success toast text; auto-cleared by the UI
   const dcmTimer = useRef(null);
 
   const call = useCallback(async (url, method, body) => {
@@ -34,33 +35,65 @@ export function useServerData(initial) {
   const setEntries = (entries) => setData((d) => ({ ...d, entries }));
   const setUsers = (users) => setData((d) => ({ ...d, users }));
   const swallow = () => {}; // error already surfaced via setError
+  const toast = (message) => setNotice(message);
 
   return {
     data,
     error,
+    notice,
     clearError: () => setError(""),
+    clearNotice: () => setNotice(""),
 
-    addEntry: (entry) => call("/api/entries", "POST", { entry }).then((r) => setEntries(r.entries), swallow),
+    addEntry: (entry) =>
+      call("/api/entries", "POST", { entry }).then((r) => {
+        setEntries(r.entries);
+        toast(`Case logged — ${entry.violation} (${entry.date}).`);
+      }, swallow),
     commitRta: (entries) =>
-      call("/api/entries", "POST", { entries, source: "rta" }).then((r) => setEntries(r.entries), swallow),
-    patchEntry: (entry) => call(`/api/entries/${entry.id}`, "PATCH", { entry }).then((r) => setEntries(r.entries), swallow),
-    deleteEntry: (id) => call(`/api/entries/${id}`, "DELETE").then((r) => setEntries(r.entries), swallow),
+      call("/api/entries", "POST", { entries, source: "rta" }).then((r) => {
+        setEntries(r.entries);
+        toast(`RTA import committed — ${entries.length} case${entries.length === 1 ? "" : "s"}.`);
+      }, swallow),
+    patchEntry: (entry) =>
+      call(`/api/entries/${entry.id}`, "PATCH", { entry }).then((r) => {
+        setEntries(r.entries);
+        toast("Case updated.");
+      }, swallow),
+    deleteEntry: (id) =>
+      call(`/api/entries/${id}`, "DELETE").then((r) => {
+        setEntries(r.entries);
+        toast("Case deleted.");
+      }, swallow),
     decide: (ids, stage, assignee, comment) =>
-      call("/api/entries/decide", "POST", { ids, stage, assignee, comment }).then((r) => setEntries(r.entries), swallow),
-    loadSamples: () => call("/api/entries/samples", "POST").then((r) => setEntries(r.entries), swallow),
+      call("/api/entries/decide", "POST", { ids, stage, assignee, comment }).then((r) => {
+        setEntries(r.entries);
+        toast(
+          stage === "active"
+            ? `Escalated ${ids.length} case${ids.length === 1 ? "" : "s"} to ${assignee}.`
+            : `Dismissed ${ids.length} case${ids.length === 1 ? "" : "s"}.`
+        );
+      }, swallow),
+    loadSamples: () =>
+      call("/api/entries/samples", "POST").then((r) => {
+        setEntries(r.entries);
+        toast("Sample data loaded.");
+      }, swallow),
 
     setDcm: (dcm) => {
       setData((d) => ({ ...d, dcm }));
       clearTimeout(dcmTimer.current);
-      dcmTimer.current = setTimeout(() => call("/api/dcm", "PUT", { dcm }).catch(swallow), 800);
+      dcmTimer.current = setTimeout(
+        () => call("/api/dcm", "PUT", { dcm }).then(() => toast("Matrix saved."), swallow),
+        800
+      );
     },
     setAccounts: (accounts) => {
       setData((d) => ({ ...d, accounts }));
-      call("/api/config", "PUT", { accounts, tls: data.tls }).catch(swallow);
+      call("/api/config", "PUT", { accounts, tls: data.tls }).then(() => toast("Accounts saved."), swallow);
     },
     setTls: (tls) => {
       setData((d) => ({ ...d, tls }));
-      call("/api/config", "PUT", { accounts: data.accounts, tls }).catch(swallow);
+      call("/api/config", "PUT", { accounts: data.accounts, tls }).then(() => toast("Team leads saved."), swallow);
     },
 
     createUser: (u) => call("/api/users", "POST", u).then((r) => setUsers(r.users)),

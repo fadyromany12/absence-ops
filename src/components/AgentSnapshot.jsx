@@ -91,7 +91,7 @@ export default function AgentSnapshot({ summary, known }) {
       )}
 
       {capHit && (
-        <div className="mt-2 flex items-start gap-2 p-2" style={{ background: "#FBF6F0", border: `1px solid ${P.amber}55`, borderRadius: 6 }}>
+        <div className="mt-2 flex items-start gap-2 p-2" style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${P.amber}55`, borderRadius: 6 }}>
           <Scale size={13} color={P.amber} style={{ flexShrink: 0, marginTop: 2 }} />
           <span style={{ fontSize: 12, color: P.inkSoft }}>
             Monthly deduction cap reached — {days(summary.monthDeduction)} already taken. Any further deduction this

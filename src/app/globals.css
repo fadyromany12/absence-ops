@@ -18,6 +18,61 @@ body {
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ── Glass & motion system ────────────────────────────────────────────────
+   The workspace styles itself inline from lib/tokens.js; these classes add
+   what inline styles can't: backdrop blur, keyframe entrances, hover lifts. */
+
+.ao-glass {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 8px 32px rgba(2, 6, 23, 0.4);
+}
+
+@keyframes aoRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes aoFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes aoPop {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes aoPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.ao-rise { animation: aoRise 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ao-fade { animation: aoFade 0.22s ease-out both; }
+.ao-pop { animation: aoPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ao-pulse { animation: aoPulse 2.2s ease-in-out infinite; }
+
+.ao-lift { transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.2s ease, background-color 0.2s ease; }
+.ao-lift:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(2, 6, 23, 0.55); }
+
+/* Every interactive control gets a soft press + smooth state changes. */
+button {
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    transform 0.15s ease, box-shadow 0.2s ease, opacity 0.18s ease;
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+
+/* Native form controls (date/time pickers, dropdowns) render dark. */
+.ao-body { color-scheme: dark; }
+.ao-body select option {
+  background: #0d1a24;
+  color: #e2e8f0;
+}
+
+/* Thin dark scrollbars to match the glass. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); border: 2px solid transparent; background-clip: content-box; }
+
 /* ── Legacy type helpers (the ported staff views still use these) ────────── */
 
 .ao-disp {
@@ -35,7 +90,7 @@ body {
   font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
 }
 .ao-body :focus-visible {
-  outline: 2px solid #0c5e63;
+  outline: 2px solid #34b3a8;
   outline-offset: 2px;
 }
 

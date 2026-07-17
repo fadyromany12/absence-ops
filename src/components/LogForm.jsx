@@ -109,7 +109,7 @@ export default function LogForm({ data, onAdd, onCancel, defaultAccount }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
       {/* ── Left: the form ── */}
-      <div className="p-4 md:p-5" style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 10 }}>
+      <div className="p-4 md:p-5 ao-glass" style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 10 }}>
         <div className="ao-disp font-bold uppercase tracking-wide flex items-center gap-2" style={{ fontSize: 16, color: P.ink }}>
           <ClipboardPlus size={17} color={P.petrol} />
           Log absence / violation

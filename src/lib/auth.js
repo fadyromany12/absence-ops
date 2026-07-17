@@ -20,11 +20,11 @@ export const MIN_PASSWORD = 8;
 /* What each staff role may see. Agents never reach the workspace at all —
    they live in /agent-portal, enforced by the route-group layouts. */
 export const TABS_FOR = {
-  SuperAdmin: ["dashboard", "log", "rta", "triage", "approvals", "agents", "dcm", "users", "settings"],
+  SuperAdmin: ["dashboard", "log", "rta", "triage", "approvals", "agents", "audit", "dcm", "users", "settings"],
   WFM: ["rta"],
   ProjectManager: ["dashboard", "log", "triage", "agents"],
   OperationsLead: ["dashboard", "approvals", "agents"],
-  HRBusinessPartner: ["dashboard", "approvals", "agents"],
+  HRBusinessPartner: ["dashboard", "approvals", "agents", "audit"],
   Agent: [],
 };
 
@@ -40,6 +40,7 @@ const PERMS = {
   admin: ["SuperAdmin"], // DCM, users, settings, factory reset
   delete: ["SuperAdmin"], // destroying a case erases evidence — admin only
   acknowledge: ["Agent"], // digital signature on finalized cases
+  audit: ["SuperAdmin", "HRBusinessPartner"], // read the immutable system log
 };
 
 export const can = (user, action) => !!user && (PERMS[action] || []).includes(user.role);

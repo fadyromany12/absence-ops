@@ -20,7 +20,7 @@ export const Field = ({ label, children, span }) => (
 
 const inputStyle = {
   border: `1px solid ${P.line}`,
-  background: "#FBFCFB",
+  background: "rgba(255,255,255,0.05)",
   color: P.ink,
   borderRadius: 6,
   padding: "8px 10px",
@@ -62,7 +62,7 @@ export const Toggle = ({ on, label, onClick, disabledLook, title }) => (
       padding: "4px 10px",
       borderRadius: 6,
       cursor: "pointer",
-      color: on ? "#fff" : disabledLook ? "#9AA8AB" : P.sub,
+      color: on ? "#fff" : disabledLook ? "#6E8287" : P.sub,
       background: on ? P.green : "transparent",
       border: `1px ${disabledLook && !on ? "dashed" : "solid"} ${on ? P.green : P.line}`,
     }}
@@ -83,7 +83,7 @@ export const BtnPrimary = ({ children, onClick, disabled, bg, title, icon: Icon 
       padding: "10px 18px",
       borderRadius: 6,
       color: "#fff",
-      background: disabled ? "#9AB5B4" : bg || P.petrol,
+      background: disabled ? "rgba(52,179,168,0.35)" : bg || P.petrol,
       border: "none",
       cursor: disabled ? "default" : "pointer",
     }}
@@ -103,7 +103,7 @@ export const BtnGhost = ({ children, onClick, color, disabled, title, icon: Icon
       fontSize: 13,
       padding: "10px 16px",
       borderRadius: 6,
-      color: disabled ? "#9AA8AB" : color || P.inkSoft,
+      color: disabled ? "#6E8287" : color || P.inkSoft,
       background: "transparent",
       border: `1px solid ${P.line}`,
       cursor: disabled ? "default" : "pointer",
@@ -115,7 +115,7 @@ export const BtnGhost = ({ children, onClick, color, disabled, title, icon: Icon
 );
 
 export const Card = ({ title, children, right, accent }) => (
-  <div className="p-4" style={{ background: P.card, border: `1px solid ${accent || P.line}`, borderRadius: 10 }}>
+  <div className="p-4 ao-glass" style={{ background: P.card, border: `1px solid ${accent || P.line}`, borderRadius: 12 }}>
     {(title || right) && (
       <div className="flex items-center justify-between gap-2">
         <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 13, color: P.sub }}>

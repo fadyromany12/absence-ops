@@ -36,7 +36,7 @@ export function GlassCard({
   return (
     <section
       className={cx(
-        "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl",
+        "ao-rise rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl",
         glow ? glows[glow] : "shadow-[0_8px_32px_rgba(2,6,23,0.45)]",
         "p-5",
         className
@@ -172,7 +172,7 @@ export function GlassStat({
     violet: "text-violet-300",
   } as const;
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
+    <div className="ao-rise ao-lift rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
       <div className={cx("font-mono text-2xl font-semibold leading-none", valueTones[tone])}>{value}</div>
       <div className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
       {hint && <div className="mt-1 text-[11.5px] text-slate-500">{hint}</div>}
@@ -232,7 +232,7 @@ export function GlassModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="ao-fade fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -241,7 +241,7 @@ export function GlassModal({
         aria-modal="true"
         tabIndex={-1}
         className={cx(
-          "max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/70",
+          "ao-pop max-h-[88vh] w-full overflow-y-auto rounded-2xl border border-white/10 bg-slate-900/70",
           "p-6 shadow-[0_24px_80px_rgba(2,6,23,0.7)] backdrop-blur-2xl outline-none",
           wide ? "max-w-2xl" : "max-w-lg"
         )}
