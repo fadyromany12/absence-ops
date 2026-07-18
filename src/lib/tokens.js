@@ -1,41 +1,43 @@
-/* Design tokens — the dark glass palette.
+/* Design tokens — Quorum's "Ink & Signal" palette.
 
    The workspace components style themselves inline from this object, so this
-   file IS the theme: every card, pill and border reads from here at runtime.
-   v4 flips the palette from the legacy light "paper" look to the frosted dark
-   aesthetic the login and agent portal already wear — translucent whites over
-   the aurora backdrop painted by globals.css. */
+   file IS the theme: every card, pill and border reads from it at runtime.
+   One accent — the violet Signal — carries the brand; amber/rose/green stay
+   strictly semantic (warning/danger/success), never decorative. */
 
 export const P = {
   // Surfaces
-  paper: "transparent", // the aurora body shows through
-  card: "rgba(255,255,255,0.055)", // frosted card fill (pair with .ao-glass for blur)
-  deep: "rgba(8,18,26,0.72)", // headers & verdict panels — darker than the cards
-  mist: "rgba(255,255,255,0.07)", // inset wells, chart tracks, chips
-  line: "rgba(255,255,255,0.12)", // hairline borders
+  paper: "transparent", // the ink aurora shows through
+  card: "rgba(255,255,255,0.045)", // frosted panel fill (pair with .ao-glass for blur)
+  deep: "rgba(7,10,18,0.74)", // headers & verdict panels — darker than the cards
+  mist: "rgba(255,255,255,0.08)", // inset wells, chart tracks, chips
+  line: "rgba(255,255,255,0.09)", // hairline borders
 
   // Text
-  ink: "#E9F1F0", // primary
-  inkSoft: "#C9D6D4", // secondary
-  sub: "#8FA6A9", // muted / labels
+  ink: "#F4F7F9", // primary
+  inkSoft: "#B7C3CC", // secondary
+  sub: "#8B9AA6", // muted / labels
 
-  // Accents (brightened for dark backgrounds)
-  petrol: "#34B3A8",
-  amber: "#E8A54B",
-  brick: "#EC6F5D",
-  green: "#46C08A",
+  // The Signal — Quorum violet. Primary actions, active nav, pending states.
+  petrol: "#8B5CF6", // (name kept for compatibility: ~40 call sites read P.petrol)
+
+  // Semantic accents
+  amber: "#F5A623",
+  brick: "#F26D5F",
+  green: "#34D399",
 };
 
 export const SEV_ORDER = ["Minor", "Moderate", "Serious", "Zero Tolerance"];
 
 export const SEV_COLOR = {
   Minor: "#93A6AB",
-  Moderate: "#E8A54B",
-  Serious: "#EC6F5D",
-  "Zero Tolerance": "#A78BFA", // violet — matches the portal's high-priority accent
+  Moderate: "#F5A623",
+  Serious: "#F26D5F",
+  // Magenta, not violet: Zero Tolerance must never read as brand accent.
+  "Zero Tolerance": "#F472B6",
 };
 
-export const ACCOUNT_COLORS = { Hertz: "#FBBF24", Lenovo: "#F87171", Beko: "#60A5FA" };
+export const ACCOUNT_COLORS = { Hertz: "#F5A623", Lenovo: "#F87171", Beko: "#38BDF8" };
 
 export const STATUS_COLOR = {
   "Pending review": P.petrol,

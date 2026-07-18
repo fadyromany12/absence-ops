@@ -325,11 +325,11 @@ function TrendBars({ weekly }) {
                 <title>{`${fmtDate(w.start)} – ${fmtDate(w.end)}: ${fmtMin(w.min)} lost across ${w.count} case${w.count === 1 ? "" : "s"}`}</title>
               </rect>
               {w.min > 0 && (
-                <text x={x + bw * 0.32} y={H - h - 6} textAnchor="middle" className="ao-mono" style={{ fontSize: 11, fill: isCurrent ? "#34B3A8" : "#8FA6A9" }}>
+                <text x={x + bw * 0.32} y={H - h - 6} textAnchor="middle" className="ao-mono" style={{ fontSize: 11, fill: isCurrent ? "#34B3A8" : "#8B9AA6" }}>
                   {fmtMin(w.min)}
                 </text>
               )}
-              <text x={x + bw * 0.32} y={H + 18} textAnchor="middle" className="ao-mono" style={{ fontSize: 10, fill: "#8FA6A9" }}>
+              <text x={x + bw * 0.32} y={H + 18} textAnchor="middle" className="ao-mono" style={{ fontSize: 10, fill: "#8B9AA6" }}>
                 {fmtDate(w.end)}
               </text>
             </g>

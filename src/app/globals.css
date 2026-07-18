@@ -1,21 +1,38 @@
-@import url("https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
-/* ── Base ─────────────────────────────────────────────────────────────────
-   Dark-mode-first: the body paints the deep slate "aurora" backdrop every
-   glass surface blurs against. The staff workspace (still on the legacy light
-   look until its glass pass) paints its own opaque background over this. */
+/* ── Ink & Signal ─────────────────────────────────────────────────────────
+   Quorum's base: true-ink background with a single-hue violet aurora — one
+   Signal color, so the glow always reads as brand. Fonts arrive as CSS
+   variables from next/font in layout.tsx (Space Grotesk display, Geist Sans
+   UI, Geist Mono data); no external font requests. */
 
 body {
   min-height: 100vh;
-  background-color: #060b16;
+  background-color: #05070c;
   background-image:
-    radial-gradient(60rem 40rem at 12% -10%, rgba(16, 185, 129, 0.13), transparent 60%),
-    radial-gradient(50rem 36rem at 100% 0%, rgba(139, 92, 246, 0.16), transparent 55%),
-    radial-gradient(44rem 34rem at 50% 115%, rgba(14, 116, 144, 0.18), transparent 60%);
+    radial-gradient(56rem 38rem at 14% -12%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(48rem 34rem at 102% 4%, rgba(109, 40, 217, 0.14), transparent 55%),
+    radial-gradient(46rem 36rem at 50% 118%, rgba(139, 92, 246, 0.1), transparent 60%);
   background-attachment: fixed;
   color: #e2e8f0;
-  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Hero elements get a 1px top edge of Signal light fading to nothing —
+   the quiet Linear-style detail that separates hero cards from panels. */
+.gradient-hairline {
+  position: relative;
+}
+.gradient-hairline::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.65), transparent);
+  pointer-events: none;
 }
 
 /* ── Glass & motion system ────────────────────────────────────────────────
@@ -76,21 +93,22 @@ button:active:not(:disabled) { transform: scale(0.97); }
 /* ── Legacy type helpers (the ported staff views still use these) ────────── */
 
 .ao-disp {
-  font-family: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
 }
 .ao-mono {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 .ao-body {
-  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 .ao-body input,
 .ao-body select,
 .ao-body textarea {
-  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 .ao-body :focus-visible {
-  outline: 2px solid #34b3a8;
+  outline: 2px solid rgba(139, 92, 246, 0.65);
   outline-offset: 2px;
 }
 

@@ -1,6 +1,8 @@
-# Absence Ops
+# Quorum
 
-**Live demo:** https://absence-ops.vercel.app — every account below signs in with `Welcome@123`.
+*Workforce compliance — present and accounted for.* (Formerly “Absence Ops.”)
+
+**Live demo:** https://quorum-ops.vercel.app — every account below signs in with `Welcome@123`.
 
 Full-stack BPO workforce & compliance for Konecta GDC accounts (Lenovo, Hertz, Beko): daily absence
 logging, RTA bulk imports, a rule-driven Disciplinary Consequences Matrix, multi-tier approvals with
@@ -9,6 +11,8 @@ where finalized disciplinary actions are digitally acknowledged and signed.
 
 **Stack:** Next.js (App Router) · PostgreSQL via Prisma 7 · NextAuth v5 (JWT credentials) ·
 Tailwind 4 · a pure, framework-free rules engine shared by the server, the client and the tests.
+**Identity:** the “Ink & Signal” design system — true-ink glass surfaces, one violet Signal accent,
+Space Grotesk / Geist type, and the ring-of-presence mark (six seats filled, two empty: quorum met).
 
 ## Quick start
 

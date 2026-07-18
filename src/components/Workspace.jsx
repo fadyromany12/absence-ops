@@ -33,6 +33,8 @@ import {
 
 import { useServerData } from "../hooks/useServerData.js";
 import { P, accColor } from "../lib/tokens.js";
+import { BRAND } from "../lib/brand";
+import Logo from "./Logo";
 import { todayStr, daysAgo, monthOf } from "../lib/dates.js";
 import { fmtMin } from "../lib/format.js";
 import { statusOf, computeEscalations, countsForDiscipline } from "../lib/engine.js";
@@ -192,17 +194,7 @@ export default function Workspace({ initial, me }) {
       >
         <div className="mx-auto px-4 py-4" style={{ maxWidth: 1320 }}>
           <div className="flex items-center gap-3 flex-wrap">
-            <div style={{ width: 30, height: 30, background: P.petrol, borderRadius: 6, position: "relative", flexShrink: 0 }}>
-              <div style={{ position: "absolute", right: 3, top: 3, width: 8, height: 8, background: P.amber, borderRadius: 2 }} />
-            </div>
-            <div className="min-w-0">
-              <div className="ao-disp font-bold uppercase" style={{ fontSize: 19, letterSpacing: 2, color: "#F2F6F5", lineHeight: 1 }}>
-                Absence Ops
-              </div>
-              <div style={{ fontSize: 11.5, color: "#8FA6A9" }}>
-                Daily leave &amp; absence management · Konecta GDC · DCM v1.0
-              </div>
-            </div>
+            <Logo size={34} subtitle={`${BRAND.tagline} · ${BRAND.org} · DCM v1.0`} />
             <span className="flex-1" />
             <UserChip me={me} onLogout={() => signOut({ callbackUrl: "/login" })} />
           </div>
@@ -220,7 +212,7 @@ export default function Workspace({ initial, me }) {
                   cursor: "pointer",
                   color: acc === a ? "#06121A" : "#C9D6D4",
                   background: acc === a ? "#E9F1F0" : "transparent",
-                  border: `1px solid ${acc === a ? "#E9F1F0" : "#3A545C"}`,
+                  border: `1px solid ${acc === a ? "#E9F1F0" : "#3A4155"}`,
                 }}
               >
                 {a !== "All" && (
@@ -234,7 +226,7 @@ export default function Workspace({ initial, me }) {
               value={range}
               onChange={(e) => setRange(e.target.value)}
               className="ao-disp uppercase tracking-wide font-semibold"
-              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, background: "transparent", color: "#C9D6D4", border: "1px solid #3A545C" }}
+              style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, background: "transparent", color: "#C9D6D4", border: "1px solid #3A4155" }}
             >
               <option value="all" style={{ color: P.ink }}>All time</option>
               <option value="30" style={{ color: P.ink }}>Last 30 days</option>
@@ -510,12 +502,12 @@ export default function Workspace({ initial, me }) {
 
 function UserChip({ me, onLogout }) {
   return (
-    <div className="flex items-center gap-2 pl-3" style={{ borderLeft: "1px solid #3A545C" }}>
+    <div className="flex items-center gap-2 pl-3" style={{ borderLeft: "1px solid #3A4155" }}>
       <div className="text-right min-w-0">
         <div className="ao-disp font-semibold truncate" style={{ fontSize: 12.5, color: "#F2F6F5", lineHeight: 1.2 }}>
           {me.name}
         </div>
-        <div className="ao-mono" style={{ fontSize: 10, color: "#8FA6A9" }}>
+        <div className="ao-mono" style={{ fontSize: 10, color: "#8B9AA6" }}>
           {ROLE_LABEL[me.role]}
         </div>
       </div>
@@ -523,7 +515,7 @@ function UserChip({ me, onLogout }) {
         onClick={onLogout}
         title="Sign out"
         aria-label="Sign out"
-        style={{ border: "1px solid #3A545C", background: "transparent", color: "#C9D6D4", borderRadius: 6, padding: 6, cursor: "pointer", display: "flex" }}
+        style={{ border: "1px solid #3A4155", background: "transparent", color: "#C9D6D4", borderRadius: 6, padding: 6, cursor: "pointer", display: "flex" }}
       >
         <LogOut size={13} />
       </button>
@@ -595,7 +587,7 @@ function KPI({ label, value, icon: Icon, tone, onClick }) {
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
-      className={onClick ? "p-3 ao-glass ao-lift" : "p-3 ao-glass"}
+      className={onClick ? "p-3 ao-glass ao-lift gradient-hairline" : "p-3 ao-glass gradient-hairline"}
       style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 12, cursor: onClick ? "pointer" : "default" }}
     >
       <div className="flex items-center gap-2">

@@ -10,7 +10,7 @@ import { fmtDateLong, days } from "../lib/format.js";
 
 const INK_TEXT = "#F2F6F5";
 const INK_SOFT = "#B9C9C7";
-const INK_ACCENT = "#8FB6B3";
+const INK_ACCENT = "#B9AFE6";
 
 export default function VerdictPanel({ verdict }) {
   if (!verdict) return null;
@@ -19,7 +19,7 @@ export default function VerdictPanel({ verdict }) {
   const capped = cap.prescribed > cap.applied;
 
   return (
-    <div className="ao-glass" style={{ background: P.deep, borderRadius: 10, overflow: "hidden", border: `1px solid ${P.line}` }}>
+    <div className="ao-glass gradient-hairline" style={{ background: P.deep, borderRadius: 10, overflow: "hidden", border: `1px solid ${P.line}` }}>
       <div className="flex">
         <div style={{ width: 6, background: sev, flexShrink: 0 }} />
         <div className="p-4 flex-1 min-w-0">
@@ -72,7 +72,7 @@ function DeductionBar({ cap, capped }) {
   return (
     <div
       className="mt-3 p-3 flex items-center gap-3 flex-wrap"
-      style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6, border: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
+      style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6, border: `1px solid ${capped ? P.amber : "#3A3555"}` }}
     >
       <Scale size={16} color={capped ? P.amber : INK_ACCENT} />
       <div>
@@ -120,7 +120,7 @@ function LawStrip({ capped, cap }) {
   return (
     <div
       className="px-4 py-2 flex items-center gap-2"
-      style={{ background: capped ? "#3A2A16" : "#16303A", borderTop: `1px solid ${capped ? P.amber : "#2C4A54"}` }}
+      style={{ background: capped ? "#3A2A16" : "#1D1936", borderTop: `1px solid ${capped ? P.amber : "#3A3555"}` }}
     >
       <Scale size={13} color={capped ? P.amber : INK_ACCENT} />
       <span style={{ fontSize: 11.5, color: capped ? "#F0D6A8" : INK_ACCENT }}>

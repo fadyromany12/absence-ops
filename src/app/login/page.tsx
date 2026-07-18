@@ -7,22 +7,8 @@ import { useState, type FormEvent } from "react";
 import { signIn } from "next-auth/react";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 import { GlassCard, GlassButton, GlassInput, GlassLabel } from "@/components/glass";
-
-function Logo() {
-  return (
-    <div className="mb-6 flex items-center justify-center gap-3">
-      <div className="relative h-9 w-9 rounded-lg bg-emerald-500/80 shadow-[0_0_28px_rgba(16,185,129,0.55)]">
-        <div className="absolute right-1 top-1 h-2 w-2 rounded-sm bg-amber-400" />
-      </div>
-      <div>
-        <div className="text-xl font-bold uppercase tracking-[0.2em] text-slate-100" style={{ fontFamily: "Barlow Semi Condensed" }}>
-          Absence Ops
-        </div>
-        <div className="text-[11px] text-slate-400">Konecta GDC · workforce &amp; compliance</div>
-      </div>
-    </div>
-  );
-}
+import Logo from "@/components/Logo";
+import { BRAND } from "@/lib/brand";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -48,11 +34,13 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Logo />
-        <GlassCard glow="emerald">
+        <div className="mb-6 flex justify-center">
+          <Logo size={40} subtitle={`${BRAND.org} · ${BRAND.tagline}`} />
+        </div>
+        <GlassCard glow="violet" className="gradient-hairline">
           <form onSubmit={submit} className="grid gap-4">
             <h1 className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-wider text-slate-200">
-              <LogIn size={15} className="text-emerald-300" />
+              <LogIn size={15} className="text-violet-300" />
               Sign in
             </h1>
             <div>

@@ -29,8 +29,6 @@ export const PER_INCIDENT_CAP = 5;
 export const PER_MONTH_CAP = 5;
 export const LAW_CITATION = "Egyptian Labour Law No. 12/2003 (am. 14/2025)";
 
-export const STORAGE_KEY = "absence-ops:v1";
-export const SESSION_KEY = "absence-ops:session";
 export const DATA_VERSION = 4;
 
 export const DEFAULTS = {

@@ -116,7 +116,7 @@ export default function RtaUploader({ data, me, onCommit }) {
               className="mt-4 p-8 text-center"
               style={{
                 border: `2px dashed ${dragOver ? P.petrol : P.line}`,
-                background: dragOver ? "rgba(52,179,168,0.10)" : "rgba(255,255,255,0.05)",
+                background: dragOver ? "rgba(139,92,246,0.10)" : "rgba(255,255,255,0.05)",
                 borderRadius: 12,
                 cursor: "pointer",
               }}

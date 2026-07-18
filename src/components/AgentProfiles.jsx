@@ -100,7 +100,7 @@ export default function AgentProfiles({ entries, accounts }) {
                 onClick={() => setSelected(a.key)}
                 className="text-left p-3 flex ao-glass ao-lift"
                 style={{
-                  background: on ? "rgba(52,179,168,0.16)" : P.card,
+                  background: on ? "rgba(139,92,246,0.16)" : P.card,
                   border: `1px solid ${on ? P.petrol : P.line}`,
                   borderRadius: 8,
                   cursor: "pointer",
@@ -110,7 +110,7 @@ export default function AgentProfiles({ entries, accounts }) {
                   <div className="ao-disp font-bold uppercase tracking-wide truncate" style={{ fontSize: 13.5, color: on ? "#F2F6F5" : P.ink }}>
                     {a.name}
                   </div>
-                  <div className="ao-mono truncate" style={{ fontSize: 11, color: on ? "#8FA6A9" : P.sub }}>
+                  <div className="ao-mono truncate" style={{ fontSize: 11, color: on ? "#8B9AA6" : P.sub }}>
                     {a.empId || "—"} · {a.email || "no email on file"}
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -155,14 +155,14 @@ function Profile({ agent, entries }) {
         <div style={{ width: 6, background: accColor(agent.account), flexShrink: 0 }} />
         <div className="p-4 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <UserRound size={16} color="#8FB6B3" />
+            <UserRound size={16} color="#B9AFE6" />
             <span className="ao-disp font-bold uppercase" style={{ fontSize: 19, letterSpacing: 1, color: "#F2F6F5" }}>
               {agent.name}
             </span>
             <span className="flex-1" />
-            <Pill color="#8FB6B3">{agent.account}</Pill>
+            <Pill color="#B9AFE6">{agent.account}</Pill>
           </div>
-          <div className="ao-mono mt-1" style={{ fontSize: 12, color: "#8FA6A9" }}>
+          <div className="ao-mono mt-1" style={{ fontSize: 12, color: "#8B9AA6" }}>
             {agent.empId || "no employee ID"} · {agent.email || "no email on file"} · TL {agent.tl || "—"}
           </div>
 
@@ -321,7 +321,7 @@ function HeadStat({ label, value, tone }) {
       <div className="ao-mono font-semibold" style={{ fontSize: 16, color: tone || "#F2F6F5", lineHeight: 1.2 }}>
         {value}
       </div>
-      <div className="ao-disp uppercase tracking-wider font-semibold" style={{ fontSize: 9.5, color: "#8FA6A9" }}>
+      <div className="ao-disp uppercase tracking-wider font-semibold" style={{ fontSize: 9.5, color: "#8B9AA6" }}>
         {label}
       </div>
     </div>

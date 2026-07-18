@@ -83,7 +83,7 @@ export const BtnPrimary = ({ children, onClick, disabled, bg, title, icon: Icon 
       padding: "10px 18px",
       borderRadius: 6,
       color: "#fff",
-      background: disabled ? "rgba(52,179,168,0.35)" : bg || P.petrol,
+      background: disabled ? "rgba(139,92,246,0.35)" : bg || P.petrol,
       border: "none",
       cursor: disabled ? "default" : "pointer",
     }}

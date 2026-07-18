@@ -69,7 +69,7 @@ export function GlassButton({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; loading?: boolean }) {
   const variants: Record<ButtonVariant, string> = {
     primary:
-      "border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 shadow-[0_0_24px_-8px_rgba(16,185,129,0.6)]",
+      "border-violet-400/30 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25 shadow-[0_0_24px_-8px_rgba(139,92,246,0.6)]",
     violet:
       "border-violet-400/30 bg-violet-500/15 text-violet-200 hover:bg-violet-500/25 shadow-[0_0_24px_-8px_rgba(139,92,246,0.6)]",
     danger:
@@ -83,7 +83,7 @@ export function GlassButton({
       className={cx(
         "inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5",
         "text-[13px] font-semibold uppercase tracking-wider backdrop-blur-md transition",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400/70",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-400/70",
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none",
         variants[variant],
         className
@@ -108,7 +108,7 @@ export function GlassLabel({ children }: { children: ReactNode }) {
 const fieldBase =
   "w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-[14px] text-slate-100 " +
   "placeholder:text-slate-500 backdrop-blur-md transition " +
-  "focus:border-emerald-400/40 focus:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-emerald-400/20";
+  "focus:border-violet-400/40 focus:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-violet-400/20";
 
 export function GlassInput({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...rest} className={cx(fieldBase, className)} />;
