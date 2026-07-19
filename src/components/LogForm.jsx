@@ -112,7 +112,7 @@ export default function LogForm({ data, onAdd, onCancel, defaultAccount }) {
       <div className="p-4 md:p-5 ao-glass" style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 10 }}>
         <div className="ao-disp font-bold uppercase tracking-wide flex items-center gap-2" style={{ fontSize: 16, color: P.ink }}>
           <ClipboardPlus size={17} color={P.petrol} />
-          Log absence / violation
+          Log violation / leave
         </div>
         <div className="mt-1" style={{ fontSize: 12.5, color: P.sub }}>
           New cases start as <b>Pending review</b> — a TL or direct manager must escalate or dismiss them with a comment

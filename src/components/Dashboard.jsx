@@ -10,6 +10,7 @@ import { P, SEV_ORDER, accColor, sevColor } from "../lib/tokens.js";
 import { fmtMin, fmtDate, days } from "../lib/format.js";
 import { countsForDiscipline } from "../lib/engine.js";
 import { todayStr, addDays, daysBetween } from "../lib/dates.js";
+import { agentKeyOf } from "../lib/identity.js";
 
 const FLAG_ICON = { "3in30": PhoneCall, "5in60": Users, ncns: UserX, emergency: CalendarX2 };
 
@@ -25,6 +26,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
       accounts.map((a) => ({
         a,
         count: live.filter((e) => e.account === a).length,
+        disc: live.filter((e) => e.account === a && e.disciplinary).length,
         min: live.filter((e) => e.account === a).reduce((s, e) => s + (e.missingMin || 0), 0),
         ded: escalated.filter((e) => e.account === a).reduce((s, e) => s + (e.deductionApplied || 0), 0),
       })),
@@ -33,6 +35,8 @@ export default function Dashboard({ entries, accounts, escalations }) {
   const maxMin = Math.max(1, ...perAccount.map((p) => p.min));
 
   // Eight ISO-ish weeks back from today (bucket 0 = the current 7 days).
+  // Counts every case — a CSAT manipulation or bad-attitude case loses no
+  // minutes, so a minutes-only trend would render it invisible.
   const weekly = useMemo(() => {
     const today = todayStr();
     const buckets = Array.from({ length: 8 }, (_, i) => ({
@@ -40,6 +44,8 @@ export default function Dashboard({ entries, accounts, escalations }) {
       end: addDays(today, -7 * (7 - i)),
       min: 0,
       count: 0,
+      disc: 0,
+      leave: 0,
     }));
     for (const e of live) {
       const age = daysBetween(e.date, today);
@@ -47,6 +53,8 @@ export default function Dashboard({ entries, accounts, escalations }) {
       const idx = 7 - Math.floor(age / 7);
       buckets[idx].min += e.missingMin || 0;
       buckets[idx].count++;
+      if (e.disciplinary) buckets[idx].disc++;
+      else buckets[idx].leave++;
     }
     return buckets;
   }, [live]);
@@ -86,14 +94,19 @@ export default function Dashboard({ entries, accounts, escalations }) {
   }, [live]);
   const maxV = Math.max(1, ...byViolation.map((v) => v.count));
 
+  // Keyed like the rest of the app — empId first, email as fallback. RTA rows
+  // carry IDs but no emails; an email-only key would merge them all into one.
   const offenders = useMemo(() => {
     const m = {};
     for (const e of escalated) {
       if (!e.disciplinary) continue;
-      const em = (e.email || "").toLowerCase();
-      if (!m[em]) m[em] = { email: e.email, account: e.account, count: 0, ded: 0 };
-      m[em].count++;
-      m[em].ded += e.deductionApplied || 0;
+      const key = agentKeyOf(e);
+      if (!key) continue;
+      if (!m[key]) m[key] = { label: "", account: e.account, count: 0, ded: 0 };
+      m[key].count++;
+      m[key].ded += e.deductionApplied || 0;
+      m[key].label = e.agentName || e.email || e.empId || m[key].label;
+      m[key].account = e.account;
     }
     return Object.values(m)
       .sort((x, y) => y.count - x.count || y.ded - x.ded)
@@ -148,8 +161,16 @@ export default function Dashboard({ entries, accounts, escalations }) {
         )}
       </Card>
 
-      {/* Trend: hours lost per week, last 8 weeks */}
-      <Card title="Hours lost — last 8 weeks" right={<Pill color={P.sub}>weekly</Pill>}>
+      {/* Trend: case volume per week, last 8 weeks */}
+      <Card
+        title="Case volume — last 8 weeks"
+        right={
+          <span className="flex items-center gap-2">
+            <Pill color={P.brick}>disciplinary</Pill>
+            <Pill color={P.green}>leave</Pill>
+          </span>
+        }
+      >
         <TrendBars weekly={weekly} />
       </Card>
 
@@ -177,6 +198,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
                   </div>
                   <div className="flex gap-3 mt-1" style={{ fontSize: 11, color: P.sub }}>
                     <span>{p.count} records</span>
+                    <span style={{ color: p.disc ? P.brick : P.sub }}>{p.disc} disciplinary</span>
                     <span>{days(p.ded)} deducted</span>
                   </div>
                 </div>
@@ -254,10 +276,10 @@ export default function Dashboard({ entries, accounts, escalations }) {
           ) : (
             <div className="grid gap-2">
               {offenders.map((o) => (
-                <div key={o.email} className="flex items-center gap-2">
+                <div key={o.label} className="flex items-center gap-2">
                   <span style={{ width: 8, height: 8, borderRadius: 999, background: accColor(o.account), flexShrink: 0 }} />
                   <span className="ao-mono truncate flex-1" style={{ fontSize: 12.5, color: P.ink }}>
-                    {o.email}
+                    {o.label}
                   </span>
                   {o.ded > 0 && (
                     <span
@@ -282,51 +304,50 @@ export default function Dashboard({ entries, accounts, escalations }) {
   );
 }
 
-/* Eight weeks of lost time as glowing bars — pure SVG, no chart library. */
+/* Eight weeks of case volume as stacked bars — disciplinary below, leave on
+   top — pure SVG, no chart library. Hours lost ride along in the label and
+   tooltip so the lost-time signal isn't lost, but the bar answers "how many
+   violations", which zero-minute cases (CSAT, attitude, …) need it to. */
 function TrendBars({ weekly }) {
-  const max = Math.max(1, ...weekly.map((w) => w.min));
+  const max = Math.max(1, ...weekly.map((w) => w.count));
   const W = 720;
   const H = 150;
   const pad = 8;
   const bw = (W - pad * 2) / weekly.length;
 
   if (weekly.every((w) => w.count === 0)) {
-    return <Muted>No lost time recorded in the last eight weeks.</Muted>;
+    return <Muted>No cases recorded in the last eight weeks.</Muted>;
   }
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <svg viewBox={`0 0 ${W} ${H + 30}`} style={{ width: "100%", minWidth: 480 }} role="img" aria-label="Hours lost per week, last 8 weeks">
-        <defs>
-          <linearGradient id="trendbar" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34B3A8" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#34B3A8" stopOpacity="0.25" />
-          </linearGradient>
-        </defs>
+      <svg viewBox={`0 0 ${W} ${H + 30}`} style={{ width: "100%", minWidth: 480 }} role="img" aria-label="Cases per week, last 8 weeks">
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={pad} x2={W - pad} y1={H - H * f} y2={H - H * f} stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
         ))}
         {weekly.map((w, i) => {
-          const h = Math.max(w.min > 0 ? 4 : 0, (w.min / max) * (H - 12));
+          const scale = (H - 16) / max;
+          const discH = w.disc * scale;
+          const leaveH = w.leave * scale;
           const x = pad + i * bw + bw * 0.18;
           const isCurrent = i === weekly.length - 1;
+          const dim = isCurrent ? 1 : 0.45;
+          const tip = `${fmtDate(w.start)} – ${fmtDate(w.end)}: ${w.count} case${w.count === 1 ? "" : "s"} (${w.disc} disciplinary, ${w.leave} leave) · ${fmtMin(w.min)} lost`;
           return (
             <g key={w.start}>
-              <rect
-                x={x}
-                y={H - h}
-                width={bw * 0.64}
-                height={h}
-                rx="6"
-                fill={isCurrent ? "url(#trendbar)" : "rgba(255,255,255,0.14)"}
-                stroke={isCurrent ? "#34B3A8" : "rgba(255,255,255,0.18)"}
-                strokeWidth="1"
-              >
-                <title>{`${fmtDate(w.start)} – ${fmtDate(w.end)}: ${fmtMin(w.min)} lost across ${w.count} case${w.count === 1 ? "" : "s"}`}</title>
-              </rect>
-              {w.min > 0 && (
-                <text x={x + bw * 0.32} y={H - h - 6} textAnchor="middle" className="ao-mono" style={{ fontSize: 11, fill: isCurrent ? "#34B3A8" : "#8B9AA6" }}>
-                  {fmtMin(w.min)}
+              {leaveH > 0 && (
+                <rect x={x} y={H - discH - leaveH} width={bw * 0.64} height={leaveH} rx="3" fill={P.green} opacity={0.55 * dim + 0.25}>
+                  <title>{tip}</title>
+                </rect>
+              )}
+              {discH > 0 && (
+                <rect x={x} y={H - discH} width={bw * 0.64} height={discH} rx="3" fill={P.brick} opacity={0.75 * dim + 0.25}>
+                  <title>{tip}</title>
+                </rect>
+              )}
+              {w.count > 0 && (
+                <text x={x + bw * 0.32} y={H - discH - leaveH - 6} textAnchor="middle" className="ao-mono" style={{ fontSize: 11, fill: isCurrent ? "#F2F6F5" : "#8B9AA6" }}>
+                  {w.count}
                 </text>
               )}
               <text x={x + bw * 0.32} y={H + 18} textAnchor="middle" className="ao-mono" style={{ fontSize: 10, fill: "#8B9AA6" }}>

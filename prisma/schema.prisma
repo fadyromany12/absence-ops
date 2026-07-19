@@ -1,4 +1,4 @@
-// Absence Ops — relational schema.
+// Quorum — relational schema.
 //
 // Field names on Case deliberately mirror the pure rules engine's entry shape
 // (src/lib/engine.js): rows read from Prisma are engine-ready after the thin

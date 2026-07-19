@@ -23,6 +23,7 @@ import {
   ScrollText,
   Clock3,
   Scale,
+  ShieldAlert,
   TriangleAlert,
   Plus,
   CircleCheck,
@@ -141,6 +142,7 @@ export default function Workspace({ initial, me }) {
   // Hours were lost whether or not a manager has ruled, so triage-stage cases
   // count. Deductions are only scheduled once a case is escalated.
   const hoursLost = live.reduce((s, e) => s + (e.missingMin || 0), 0);
+  const disciplinaryCount = live.filter((e) => e.disciplinary).length;
   const deductionPool = scoped.filter(countsForDiscipline).reduce((s, e) => s + (e.deductionApplied || 0), 0);
   const activeEscalations = pendingOps.length + pendingHr.length;
 
@@ -270,7 +272,7 @@ export default function Workspace({ initial, me }) {
                   setShowForm(true);
                 }}
               >
-                Log absence
+                Log case
               </BtnPrimary>
             </div>
           )}
@@ -287,7 +289,8 @@ export default function Workspace({ initial, me }) {
 
           {/* KPI scorecard — noise for WFM, whose whole job here is the upload */}
           {me.role !== "WFM" && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+              <KPI label="Disciplinary cases" value={disciplinaryCount} icon={ShieldAlert} tone={disciplinaryCount ? P.brick : P.green} />
               <KPI label="Total hours lost" value={fmtMin(hoursLost)} icon={Clock3} tone={hoursLost ? P.brick : P.green} />
               <KPI
                 label="Pending triage review"
@@ -334,7 +337,7 @@ export default function Workspace({ initial, me }) {
                   can(me, "log") && (
                     <div>
                       <BtnPrimary icon={Plus} onClick={() => setShowForm(true)}>
-                        Log absence
+                        Log case
                       </BtnPrimary>
                     </div>
                   )
@@ -632,7 +635,7 @@ function EmptyState({ canLog, canSamples, onLog, onSamples }) {
   return (
     <div className="p-8 text-center" style={{ background: P.card, border: `1px dashed ${P.line}`, borderRadius: 12 }}>
       <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 18, color: P.ink }}>
-        No absences logged yet
+        No cases logged yet
       </div>
       <div className="mt-2 mx-auto" style={{ fontSize: 13.5, color: P.sub, maxWidth: 470 }}>
         Log the first case: the matrix prescribes the action, a TL or direct manager escalates or dismisses it with a
@@ -641,7 +644,7 @@ function EmptyState({ canLog, canSamples, onLog, onSamples }) {
       <div className="flex gap-3 justify-center flex-wrap mt-5">
         {canLog && (
           <BtnPrimary onClick={onLog} icon={Plus}>
-            Log first absence
+            Log first case
           </BtnPrimary>
         )}
         {canSamples && <BtnGhost onClick={onSamples}>Load sample data</BtnGhost>}
