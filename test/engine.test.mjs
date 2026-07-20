@@ -268,5 +268,38 @@ console.log("\n── RBAC + password hashing ──");
   eq("bcrypt roundtrip", [bcrypt.compareSync(DEFAULT_PASSWORD, hash), bcrypt.compareSync("nope", hash)], [true, false]);
 }
 
+console.log("\n── Login rate limiting ──");
+const { createLoginLimiter } = await import(`${LIB}/rate-limit.js`);
+{
+  const lim = createLoginLimiter({ max: 3, windowMs: 1000 });
+  const k = "a@x";
+  eq("fresh key not blocked, full budget", [lim.status(k, 0).blocked, lim.status(k, 0).remaining], [false, 3]);
+  lim.fail(k, 0);
+  lim.fail(k, 0);
+  eq("2 fails -> 1 left, not blocked", [lim.status(k, 0).remaining, lim.status(k, 0).blocked], [1, false]);
+  lim.fail(k, 0);
+  eq("hitting max blocks", lim.status(k, 0).blocked, true);
+  eq("blocked reports a positive retry", lim.status(k, 0).retryAfterMs > 0, true);
+  eq("still blocked inside the window", lim.status(k, 999).blocked, true);
+  eq("failures age out of the window", lim.status(k, 1001).blocked, false);
+}
+{
+  const lim = createLoginLimiter({ max: 3, windowMs: 1000 });
+  const k = "b@x";
+  lim.fail(k, 0);
+  lim.fail(k, 0);
+  lim.fail(k, 0);
+  eq("blocked after 3 fails", lim.status(k, 0).blocked, true);
+  lim.succeed(k);
+  eq("a success wipes the counter", [lim.status(k, 0).blocked, lim.status(k, 0).remaining, lim._size()], [false, 3, 0]);
+}
+{
+  // Independent identifiers don't share a budget.
+  const lim = createLoginLimiter({ max: 2, windowMs: 1000 });
+  lim.fail("x@x", 0);
+  lim.fail("x@x", 0);
+  eq("one key locked leaves another free", [lim.status("x@x", 0).blocked, lim.status("y@y", 0).blocked], [true, false]);
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

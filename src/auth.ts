@@ -6,6 +6,7 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/passwords";
+import { loginLimiter } from "@/lib/rate-limit.js";
 
 declare module "next-auth" {
   interface Session {
@@ -34,8 +35,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = String(creds?.email || "").trim().toLowerCase();
         const password = String(creds?.password || "");
         if (!email || !password) return null;
+
+        // Throttle before touching the DB — a locked-out identifier costs no
+        // bcrypt work and no query. Keyed by email; a success clears the count.
+        if (loginLimiter.status(email).blocked) return null;
+
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || !user.active || !verifyPassword(password, user.passHash)) return null;
+        if (!user || !user.active || !verifyPassword(password, user.passHash)) {
+          loginLimiter.fail(email);
+          return null;
+        }
+        loginLimiter.succeed(email);
         return {
           id: user.id,
           name: user.name,
