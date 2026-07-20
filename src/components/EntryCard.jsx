@@ -3,7 +3,7 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
@@ -156,6 +156,28 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
         {e.notes && (
           <div className="mt-1 truncate" style={{ fontSize: 12, color: P.sub }}>
             “{e.notes}”
+          </div>
+        )}
+
+        {e.evidenceUrl && (
+          <div className="mt-1 flex items-center gap-1 min-w-0" style={{ fontSize: 12 }}>
+            <Paperclip size={11} color={P.sub} style={{ flexShrink: 0 }} />
+            {/^https?:\/\//i.test(e.evidenceUrl) ? (
+              <a
+                href={e.evidenceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate"
+                style={{ color: P.petrol, textDecoration: "underline" }}
+                title={e.evidenceUrl}
+              >
+                {e.evidenceUrl}
+              </a>
+            ) : (
+              <span className="truncate" style={{ color: P.sub }} title={e.evidenceUrl}>
+                Evidence: {e.evidenceUrl}
+              </span>
+            )}
           </div>
         )}
 

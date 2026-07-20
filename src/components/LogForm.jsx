@@ -30,6 +30,7 @@ const blank = (accounts, tls, defaultAccount) => ({
   sickNote: false,
   missH: 0,
   missM: 0,
+  evidenceUrl: "",
   notes: "",
 });
 
@@ -80,6 +81,7 @@ export default function LogForm({ data, onAdd, onCancel, defaultAccount }) {
       violation: f.violation,
       sickNote: f.sickNote,
       missingMin: (Number(f.missH) || 0) * 60 + (Number(f.missM) || 0),
+      evidenceUrl: f.evidenceUrl.trim(),
       occurrence: v.occ,
       action: v.action,
       executor: v.executor,
@@ -103,7 +105,7 @@ export default function LogForm({ data, onAdd, onCancel, defaultAccount }) {
       createdAt: Date.now(),
     });
 
-    setF((p) => ({ ...p, email: "", empId: "", agentName: "", violation: "", sickNote: false, missH: 0, missM: 0, notes: "" }));
+    setF((p) => ({ ...p, email: "", empId: "", agentName: "", violation: "", sickNote: false, missH: 0, missM: 0, evidenceUrl: "", notes: "" }));
   };
 
   return (
@@ -194,6 +196,17 @@ export default function LogForm({ data, onAdd, onCancel, defaultAccount }) {
             </div>
           </div>
         )}
+
+        <div className="mt-3">
+          <Field label="Evidence link / reference (optional)">
+            <TInput
+              type="text"
+              placeholder="Call-recording ID, QA screenshot URL, certificate location…"
+              value={f.evidenceUrl}
+              onChange={(e) => set("evidenceUrl", e.target.value)}
+            />
+          </Field>
+        </div>
 
         <div className="mt-3">
           <Field label="Notes">

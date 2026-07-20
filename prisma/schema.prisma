@@ -73,6 +73,11 @@ model Case {
   violation String
   sickNote  Boolean @default(false)
 
+  // Evidence pointer: a link or reference to proof held in another system — a
+  // call-recording ID, a QA screenshot URL, a medical-certificate location.
+  // Free text on purpose; the app stores the pointer, not the file.
+  evidenceUrl String @default("")
+
   // Lost-time components, minutes. missingMin is net of compensation — it is
   // what analytics count.
   tardyMin   Int @default(0)

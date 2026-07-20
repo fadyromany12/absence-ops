@@ -38,6 +38,7 @@ const HEAD = [
   "HR Reference",
   "Action Date",
   "Status",
+  "Evidence",
   "Notes",
 ];
 
@@ -80,6 +81,7 @@ export function toCsv(entries) {
       e.hrRef || "",
       e.actionDate,
       statusOf(e),
+      e.evidenceUrl || "",
       e.notes,
     ];
   });

@@ -29,7 +29,7 @@ const CASE_FIELDS = [
   "id", "account", "lob", "date", "email", "empId", "agentName", "tl", "executorName",
   "shiftStart", "shiftEnd", "violation", "sickNote", "tardyMin", "earlyMin", "compMin",
   "missingMin", "occurrence", "action", "executor", "severity", "disciplinary",
-  "deductionDays", "deductionApplied", "reclassifiedFrom", "notes", "stage", "assignee",
+  "deductionDays", "deductionApplied", "reclassifiedFrom", "notes", "evidenceUrl", "stage", "assignee",
   "notified", "opsConfirmed", "hrNeeded", "hrConfirmed", "hrRef", "actionDate", "activity",
   "requiresAcknowledgement", "agentSignature",
 ] as const;
