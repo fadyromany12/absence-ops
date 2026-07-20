@@ -4,7 +4,7 @@
    the top so a thrown-out case never inflates hours lost or the deduction pool. */
 
 import { useMemo } from "react";
-import { PhoneCall, UserX, CalendarX2, Users, TriangleAlert, Scale } from "lucide-react";
+import { PhoneCall, UserX, CalendarX2, Users, TriangleAlert, Scale, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, Pill, Muted } from "./ui/index.jsx";
 import { P, SEV_ORDER, accColor, sevColor } from "../lib/tokens.js";
 import { fmtMin, fmtDate, days } from "../lib/format.js";
@@ -93,6 +93,31 @@ export default function Dashboard({ entries, accounts, escalations }) {
       .slice(0, 8);
   }, [live]);
   const maxV = Math.max(1, ...byViolation.map((v) => v.count));
+
+  // Per-violation weekly counts over the last 8 weeks, so a TL can see whether a
+  // specific violation is trending down after the warnings landed — not just how
+  // many there are in total. `delta` compares the recent four weeks with the
+  // prior four: negative is improving (fewer), positive is worsening.
+  const violationTrends = useMemo(() => {
+    const today = todayStr();
+    const map = {};
+    for (const e of live) {
+      const age = daysBetween(e.date, today);
+      if (Number.isNaN(age) || age < 0 || age >= 56) continue;
+      const idx = 7 - Math.floor(age / 7);
+      if (!map[e.violation]) map[e.violation] = { name: e.violation, sev: e.severity, weeks: Array(8).fill(0), total: 0 };
+      map[e.violation].weeks[idx]++;
+      map[e.violation].total++;
+    }
+    return Object.values(map)
+      .map((v) => {
+        const prior = v.weeks.slice(0, 4).reduce((s, n) => s + n, 0);
+        const recent = v.weeks.slice(4).reduce((s, n) => s + n, 0);
+        return { ...v, prior, recent, delta: recent - prior };
+      })
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [live]);
 
   // Keyed like the rest of the app — empId first, email as fallback. RTA rows
   // carry IDs but no emails; an email-only key would merge them all into one.
@@ -269,6 +294,19 @@ export default function Dashboard({ entries, accounts, escalations }) {
           )}
         </Card>
 
+        {/* Per-violation trend — is each type improving after warnings? */}
+        <Card title="Violation trend — last 8 weeks" right={<Pill color={P.sub}>per type</Pill>}>
+          {violationTrends.length === 0 ? (
+            <Muted>No cases in the last eight weeks to trend.</Muted>
+          ) : (
+            <div className="grid gap-2.5">
+              {violationTrends.map((v) => (
+                <VTrendRow key={v.name} v={v} />
+              ))}
+            </div>
+          )}
+        </Card>
+
         {/* Repeat offenders */}
         <Card title="Repeat cases — top agents">
           {offenders.length === 0 ? (
@@ -301,6 +339,59 @@ export default function Dashboard({ entries, accounts, escalations }) {
         </Card>
       </div>
     </div>
+  );
+}
+
+/* One violation's 8-week trajectory: a sparkline, the total, and a direction
+   badge comparing the recent four weeks with the prior four. Down is good —
+   the warnings are working — so it reads green; up reads brick. */
+function VTrendRow({ v }) {
+  const improving = v.delta < 0;
+  const worsening = v.delta > 0;
+  const Arrow = improving ? TrendingDown : worsening ? TrendingUp : Minus;
+  const tone = improving ? P.green : worsening ? P.brick : P.sub;
+  const dot = v.sev ? sevColor(v.sev) : P.green;
+  return (
+    <div className="flex items-center gap-2">
+      <span style={{ width: 8, height: 8, borderRadius: 2, background: dot, flexShrink: 0 }} />
+      <span className="truncate" style={{ width: 130, fontSize: 12.5, color: P.inkSoft, flexShrink: 0 }}>
+        {v.name}
+      </span>
+      <div className="flex-1 min-w-0">
+        <Sparkline points={v.weeks} color={dot} />
+      </div>
+      <span
+        className="ao-mono inline-flex items-center gap-0.5"
+        style={{ fontSize: 11, color: tone, width: 52, justifyContent: "flex-end" }}
+        title={`Prior 4 weeks: ${v.prior} · recent 4 weeks: ${v.recent}`}
+      >
+        <Arrow size={12} />
+        {v.delta > 0 ? `+${v.delta}` : v.delta}
+      </span>
+      <span className="ao-mono" style={{ fontSize: 12.5, color: P.ink, width: 22, textAlign: "right" }}>
+        {v.total}
+      </span>
+    </div>
+  );
+}
+
+/* A minimal inline sparkline — one polyline plus a dot on the latest week.
+   Pure SVG, sized to whatever width the flex row hands it. */
+function Sparkline({ points, color }) {
+  const W = 100;
+  const H = 26;
+  const pad = 3;
+  const max = Math.max(1, ...points);
+  const n = points.length;
+  const x = (i) => pad + (i * (W - pad * 2)) / (n - 1);
+  const y = (val) => H - pad - (val / max) * (H - pad * 2);
+  const d = points.map((val, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(val).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: "100%", height: 26, display: "block" }} role="img" aria-label="8-week trend">
+      <line x1={pad} x2={W - pad} y1={H - pad} y2={H - pad} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9" />
+      <circle cx={x(n - 1)} cy={y(points[n - 1])} r="2.2" fill={color} />
+    </svg>
   );
 }
 
