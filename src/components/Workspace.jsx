@@ -98,10 +98,18 @@ export default function Workspace({ initial, me }) {
   const [logFilter, setLogFilter] = useState("all"); // all | review | open
   const [assigneeFilter, setAssigneeFilter] = useState("All");
   const [query, setQuery] = useState("");
+  const LOG_PAGE = 50;
+  const [logLimit, setLogLimit] = useState(LOG_PAGE);
 
   useEffect(() => {
     if (!allowedTabs.includes(tab)) setTab(allowedTabs[0] || "dashboard");
   }, [me.role]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Any change to the filters is a fresh view — start back at the first page so
+  // a stale "show more" count can't carry over.
+  useEffect(() => {
+    setLogLimit(LOG_PAGE);
+  }, [logFilter, assigneeFilter, query, acc, range]);
 
   // Success toasts hang around briefly, then leave on their own.
   useEffect(() => {
@@ -386,16 +394,26 @@ export default function Workspace({ initial, me }) {
                         style={{ width: 170, fontSize: 12.5, padding: "4px 10px", borderRadius: 999 }}
                       />
                       <span className="ao-mono" style={{ fontSize: 11, color: P.sub }}>
-                        {visibleLog.length} in view
+                        {Math.min(logLimit, visibleLog.length)} of {visibleLog.length} in view
                       </span>
                     </div>
 
                     <div className="grid gap-2">
                       {visibleLog.length === 0 && <Muted>Nothing matches these filters.</Muted>}
-                      {visibleLog.map((e) => (
+                      {visibleLog.slice(0, logLimit).map((e) => (
                         <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} />
                       ))}
                     </div>
+
+                    {/* The engine always sees the whole ledger; this only caps how
+                        many rows are painted, so a long history stays responsive. */}
+                    {visibleLog.length > logLimit && (
+                      <div className="flex justify-center mt-1">
+                        <BtnGhost onClick={() => setLogLimit((n) => n + LOG_PAGE)}>
+                          Show more · {visibleLog.length - logLimit} older case{visibleLog.length - logLimit === 1 ? "" : "s"}
+                        </BtnGhost>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
