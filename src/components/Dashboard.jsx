@@ -18,7 +18,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
   // Hours lost and case counts include cases still at triage — the hours were
   // lost whether or not a manager has ruled yet. Deductions do not: nothing is
   // scheduled against payroll until the case is escalated.
-  const live = useMemo(() => entries.filter((e) => e.stage !== "dismissed"), [entries]);
+  const live = useMemo(() => entries.filter((e) => e.stage !== "dismissed" && !e.voided), [entries]);
   const escalated = useMemo(() => entries.filter(countsForDiscipline), [entries]);
 
   const perAccount = useMemo(

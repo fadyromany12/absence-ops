@@ -52,7 +52,7 @@ export default async function AgentPortalPage() {
     daysLeft: number;
   }>;
   const pendingAcks = entries
-    .filter((e) => e.requiresAcknowledgement && !e.agentAcknowledgedAt)
+    .filter((e) => e.requiresAcknowledgement && !e.agentAcknowledgedAt && !e.voided)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
   return (

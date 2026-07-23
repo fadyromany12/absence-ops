@@ -3,7 +3,7 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
@@ -21,16 +21,19 @@ const ACTION_LABEL = {
   ops: "Confirmed by OPS",
   hr: "Approved by HR",
   reopened: "Sent back to triage",
+  voided: "Voided",
+  restored: "Restored",
 };
 
-export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, selectable, selected, onSelect }) {
+export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onRestore, onPurge, selectable, selected, onSelect }) {
   const [showHistory, setShowHistory] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [hrRef, setHrRef] = useState(e.hrRef || "");
 
   const st = statusOf(e);
   const sev = e.severity ? sevColor(e.severity) : P.green;
-  const dimmed = e.stage === "dismissed";
+  const voided = !!e.voided;
+  const dimmed = e.stage === "dismissed" || voided;
   const capped = (e.deductionDays || 0) > (e.deductionApplied || 0);
 
   const log = (type, text, by = "") => ({ at: Date.now(), by, type, text });
@@ -195,7 +198,24 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
           </div>
         )}
 
-        {e.stage === "review" &&
+        {voided && (
+          <div className="mt-2 p-2" style={{ background: P.mist, borderRadius: 6, fontSize: 12.5, color: P.inkSoft }}>
+            {(e.activity || [])
+              .filter((a) => a.type === "voided")
+              .slice(-1)
+              .map((a, i) => (
+                <span key={i}>
+                  Voided{a.by ? ` by ${a.by}` : ""} · {fmtStamp(a.at)}
+                </span>
+              ))[0] || "Voided — excluded from all metrics and the engine."}
+            <div className="ao-mono mt-1" style={{ fontSize: 11, color: P.sub }}>
+              Restorable at any time · not counted while voided
+            </div>
+          </div>
+        )}
+
+        {!voided &&
+          e.stage === "review" &&
           (can(me, "triage") ? (
             <ReviewBox e={e} tls={tls} onDecide={decide} />
           ) : (
@@ -219,7 +239,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
             ))}
 
         {/* Pipeline — each step belongs to a role; SuperAdmin can tap them all */}
-        {e.stage === "active" && (
+        {!voided && e.stage === "active" && (
           <div className="flex items-center gap-2 flex-wrap mt-3">
             <Toggle
               on={e.notified}
@@ -263,7 +283,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
         )}
 
         {/* HR execution gate */}
-        {e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && can(me, "hr") && (
+        {!voided && e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed && can(me, "hr") && (
           <div className="mt-3 p-3" style={{ background: "rgba(236,111,93,0.10)", border: `1px dashed ${P.brick}66`, borderRadius: 8 }}>
             <Label>HR case reference (required to complete)</Label>
             <div className="flex gap-2 mt-1 flex-wrap">
@@ -319,18 +339,41 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, sel
             {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
           <span className="flex-1" />
-          {can(me, "delete") && (
-            <button
-              onClick={() => {
-                if (window.confirm("Delete this entry? This cannot be undone.")) onDelete(e.id);
-              }}
-              className="inline-flex items-center gap-1"
-              style={{ fontSize: 12, color: P.sub, background: "none", border: "none", cursor: "pointer" }}
-            >
-              <Trash2 size={12} />
-              Delete
-            </button>
-          )}
+          {can(me, "delete") &&
+            (voided ? (
+              <>
+                <button
+                  onClick={() => onRestore && onRestore(e)}
+                  className="inline-flex items-center gap-1"
+                  style={{ fontSize: 12, color: P.green, background: "none", border: "none", cursor: "pointer" }}
+                >
+                  <RotateCcw size={12} />
+                  Restore
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Permanently delete this case? This erases the record and cannot be undone."))
+                      onPurge && onPurge(e.id);
+                  }}
+                  className="inline-flex items-center gap-1"
+                  style={{ fontSize: 12, color: P.brick, background: "none", border: "none", cursor: "pointer" }}
+                >
+                  <Trash2 size={12} />
+                  Delete permanently
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  if (window.confirm("Void this case? It's kept and restorable, but excluded from all metrics.")) onDelete(e.id);
+                }}
+                className="inline-flex items-center gap-1"
+                style={{ fontSize: 12, color: P.sub, background: "none", border: "none", cursor: "pointer" }}
+              >
+                <Trash2 size={12} />
+                Void
+              </button>
+            ))}
         </div>
 
         {showHistory && (

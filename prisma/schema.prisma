@@ -99,6 +99,11 @@ model Case {
 
   notes String @default("")
 
+  // Soft delete. A voided case is retained and fully restorable but excluded
+  // from the engine and every metric — disciplinary records are never truly
+  // destroyed except by an explicit SuperAdmin purge.
+  voided Boolean @default(false)
+
   // Pipeline
   stage        CaseStage @default(review)
   assignee     String    @default("")

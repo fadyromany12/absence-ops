@@ -18,9 +18,10 @@ import { toAgentRef, agentMatches, agentKeyOf, agentLabel } from "./identity.js"
 /** A case counts toward discipline only once a manager has escalated it.
     Pending-review cases are deliberately inert — that is the point of the
     triage gate — and dismissed cases never count at all. */
-export const countsForDiscipline = (e) => e.stage === "active";
+export const countsForDiscipline = (e) => e.stage === "active" && !e.voided;
 
 export function statusOf(e) {
+  if (e.voided) return "Voided";
   if (e.stage === "review") return "Pending review";
   if (e.stage === "dismissed") return "Dismissed";
   if (e.notified && e.opsConfirmed && (!e.hrNeeded || e.hrConfirmed)) return "Closed";
@@ -73,6 +74,7 @@ export function emergencyUsage(entries, agent, date, excludeId) {
       e.violation === "Emergency Leave" &&
       agentMatches(e, agent) &&
       e.stage !== "dismissed" &&
+      !e.voided &&
       e.date
   );
 
@@ -387,6 +389,6 @@ export function computeEscalations(entries) {
  */
 export function monthlyDeductionFor(entries, agent, month) {
   return entries
-    .filter((e) => agentMatches(e, agent) && e.stage !== "dismissed" && monthOf(e.date) === month)
+    .filter((e) => agentMatches(e, agent) && e.stage !== "dismissed" && !e.voided && monthOf(e.date) === month)
     .reduce((s, e) => s + (e.deductionApplied || 0), 0);
 }

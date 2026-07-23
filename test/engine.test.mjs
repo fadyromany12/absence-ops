@@ -1,6 +1,6 @@
 /* Exercising the rules engine against the spec's stated behaviours. */
 const LIB = "../src/lib";
-const { verdictFor, occurrenceFor, emergencyUsage, computeEscalations } = await import(`${LIB}/engine.js`);
+const { verdictFor, occurrenceFor, emergencyUsage, computeEscalations, countsForDiscipline, statusOf } = await import(`${LIB}/engine.js`);
 const { applyLaborLawCap, settleDeductions, deductionDaysOf } = await import(`${LIB}/deductions.js`);
 const { DEFAULT_DCM } = await import(`${LIB}/dcm.js`);
 const { addDays, todayStr, daysBetween, consecutiveRun } = await import(`${LIB}/dates.js`);
@@ -124,6 +124,27 @@ eq("parse deduction days", [deductionDaysOf("Written Warning + 3-day deduction")
   eq("settle: 3 then 5 -> 3 + 2", settled.map((e) => e.deductionApplied), [3, 2]);
   const total = settled.reduce((s, e) => s + e.deductionApplied, 0);
   eq("settle: month total never exceeds 5", total, 5);
+}
+
+console.log("\n── Soft delete (void) ──");
+{
+  eq("voided case doesn't count for discipline", countsForDiscipline(mk({ voided: true })), false);
+  eq("statusOf reports Voided", statusOf(mk({ voided: true })), "Voided");
+  // A voided prior must not advance the occurrence chain.
+  const es = [mk({ date: D(10), violation: "NCNS", voided: true })];
+  eq("voided prior excluded from occurrence", occurrenceFor(es, "a@x", "NCNS", D(0)).occ, 1);
+  // Voided emergency leave does not consume the annual quota.
+  const em = [mk({ date: D(5), violation: "Emergency Leave", disciplinary: false, voided: true })];
+  eq("voided emergency not counted", emergencyUsage(em, "a@x", D(0)).yearUsed, 0);
+  // A voided case frees the month's deduction headroom for the next one.
+  const settled = settleDeductions([
+    mk({ date: "2026-06-10", violation: "NCNS", deductionApplied: 5, voided: true }),
+    mk({ date: "2026-06-20", violation: "NCNS", action: "Final Warning + 5-day deduction", deductionDays: 5 }),
+  ]);
+  eq("voided frees month headroom", settled.find((e) => !e.voided).deductionApplied, 5);
+  // Voided cases raise no systemic escalation flag.
+  const flags = computeEscalations([mk({ date: D(5), violation: "NCNS", voided: true }), mk({ date: D(20), violation: "NCNS", voided: true })]);
+  eq("voided raises no escalation flag", flags.length, 0);
 }
 
 console.log("\n── Emergency leave (spec 3C) ──");

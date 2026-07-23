@@ -78,6 +78,8 @@ export default function Workspace({ initial, me }) {
     commitRta,
     patchEntry,
     deleteEntry,
+    restoreEntry,
+    purgeEntry,
     decide,
     loadSamples,
     setDcm,
@@ -136,15 +138,19 @@ export default function Workspace({ initial, me }) {
     [data.entries, acc]
   );
 
-  const live = useMemo(() => scoped.filter((e) => e.stage !== "dismissed"), [scoped]);
-  const pendingReview = useMemo(() => scoped.filter((e) => e.stage === "review"), [scoped]);
+  // Voided cases are excluded from every pipeline set and metric; they live only
+  // in the Voided archive filter below.
+  const scopedLive = useMemo(() => scoped.filter((e) => !e.voided), [scoped]);
+  const voidedLog = useMemo(() => scoped.filter((e) => e.voided), [scoped]);
+  const live = useMemo(() => scopedLive.filter((e) => e.stage !== "dismissed"), [scopedLive]);
+  const pendingReview = useMemo(() => scopedLive.filter((e) => e.stage === "review"), [scopedLive]);
   const pendingOps = useMemo(
-    () => scoped.filter((e) => e.stage === "active" && e.notified && !e.opsConfirmed),
-    [scoped]
+    () => scopedLive.filter((e) => e.stage === "active" && e.notified && !e.opsConfirmed),
+    [scopedLive]
   );
   const pendingHr = useMemo(
-    () => scoped.filter((e) => e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed),
-    [scoped]
+    () => scopedLive.filter((e) => e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed),
+    [scopedLive]
   );
 
   // Hours were lost whether or not a manager has ruled, so triage-stage cases
@@ -172,7 +178,10 @@ export default function Workspace({ initial, me }) {
 
   const empty = data.entries.length === 0;
   const q = query.trim().toLowerCase();
-  const visibleLog = scoped.filter((e) => {
+  // The Voided filter shows the archive; every other filter works over the
+  // live (non-voided) set.
+  const logBase = logFilter === "voided" ? voidedLog : scopedLive;
+  const visibleLog = logBase.filter((e) => {
     if (logFilter === "review" && e.stage !== "review") return false;
     if (logFilter === "open") {
       const s = statusOf(e);
@@ -358,6 +367,7 @@ export default function Workspace({ initial, me }) {
                         ["all", "All"],
                         ["review", "Pending review"],
                         ["open", "Open only"],
+                        ...(voidedLog.length ? [["voided", `Voided (${voidedLog.length})`]] : []),
                       ].map(([f, lbl]) => (
                         <button
                           key={f}
@@ -368,9 +378,9 @@ export default function Workspace({ initial, me }) {
                             padding: "3px 10px",
                             borderRadius: 999,
                             cursor: "pointer",
-                            border: `1px solid ${logFilter === f ? P.petrol : P.line}`,
+                            border: `1px solid ${logFilter === f ? (f === "voided" ? P.sub : P.petrol) : P.line}`,
                             color: logFilter === f ? "#fff" : P.sub,
-                            background: logFilter === f ? P.petrol : "transparent",
+                            background: logFilter === f ? (f === "voided" ? P.sub : P.petrol) : "transparent",
                           }}
                         >
                           {lbl}
@@ -401,7 +411,7 @@ export default function Workspace({ initial, me }) {
                     <div className="grid gap-2">
                       {visibleLog.length === 0 && <Muted>Nothing matches these filters.</Muted>}
                       {visibleLog.slice(0, logLimit).map((e) => (
-                        <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} />
+                        <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} onRestore={restoreEntry} onPurge={purgeEntry} />
                       ))}
                     </div>
 
@@ -482,7 +492,7 @@ export default function Workspace({ initial, me }) {
                 onAccounts={setAccounts}
                 onTls={setTls}
                 onReset={resetAll}
-                onExport={() => downloadCsv(data.entries)}
+                onExport={() => downloadCsv(data.entries.filter((e) => !e.voided))}
                 onLoadSamples={loadSamples}
               />
             )}
