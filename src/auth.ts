@@ -6,7 +6,7 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/passwords";
-import { loginLimiter } from "@/lib/rate-limit.js";
+import { loginStatus, recordLoginFailure, clearLoginFailures } from "@/lib/login-throttle";
 
 // Authentication audit. Best-effort: a logging failure must never block a
 // login, so every write is wrapped. actorId links to the user on success.
@@ -64,22 +64,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = String(creds?.password || "");
         if (!email || !password) return null;
 
-        // Throttle before touching the DB — a locked-out identifier costs no
-        // bcrypt work and no query. Keyed by email; a success clears the count.
-        if (loginLimiter.status(email).blocked) {
+        // Throttle first — a locked-out identifier costs no bcrypt work. The
+        // window lives in Postgres, so it holds across every serverless
+        // instance; a success clears the count.
+        if ((await loginStatus(email)).blocked) {
           await auditLogin("LOGIN_BLOCKED", email, { reason: "rate_limited" });
           return null;
         }
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.active || !verifyPassword(password, user.passHash)) {
-          loginLimiter.fail(email);
+          await recordLoginFailure(email);
           await auditLogin("LOGIN_FAILED", email, {
             reason: !user ? "no_such_user" : !user.active ? "inactive" : "bad_password",
           });
           return null;
         }
-        loginLimiter.succeed(email);
+        await clearLoginFailures(email);
         await auditLogin("LOGIN_SUCCEEDED", email, { actorId: user.id, role: user.role });
         return {
           id: user.id,

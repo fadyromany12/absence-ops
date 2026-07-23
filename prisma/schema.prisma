@@ -157,6 +157,17 @@ model AppConfig {
   tls      Json // team-lead display names
 }
 
+// Login throttle state, shared across serverless instances. One row per failed
+// attempt; a sliding window over `at` decides lockout, a success clears the
+// email's rows. Rows age out on the next failure for that email.
+model LoginAttempt {
+  id    String   @id @default(cuid())
+  email String
+  at    DateTime @default(now())
+
+  @@index([email, at])
+}
+
 // Append-only system audit. The API exposes create and read — never update or
 // delete (the sole exception is the SuperAdmin factory reset, which wipes the
 // whole database). actor is SetNull so deleting a user never erases history.
