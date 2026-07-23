@@ -340,6 +340,25 @@ console.log("\n── Warning letter ──");
   eq("serious case adds the response-window clause", [ser.investigation, ser.body.some((p) => p.includes("3–5 working days"))], [true, true]);
 }
 
+console.log("\n── Paginated case query ──");
+{
+  const { buildCaseQuery } = await import(`${LIB}/entries-query.js`);
+  const base = buildCaseQuery();
+  eq("defaults: voided excluded, page 1, size 50", [base.where.voided, base.skip, base.take], [false, 0, 50]);
+  eq("newest first", base.orderBy[0].date, "desc");
+  const q2 = buildCaseQuery({ page: 3, pageSize: 20 });
+  eq("page 3 of 20 skips 40", [q2.skip, q2.take], [40, 20]);
+  eq("page size is clamped to the max", buildCaseQuery({ pageSize: 9999 }).take, 200);
+  eq("page floors at 1", buildCaseQuery({ page: 0 }).page, 1);
+  const acc = buildCaseQuery({ account: "Beko" });
+  eq("account filter applied", acc.where.account, "Beko");
+  eq("account 'All' is not a filter", buildCaseQuery({ account: "All" }).where.account, undefined);
+  const filtered = buildCaseQuery({ q: "nour", from: "2026-01-01", to: "2026-12-31", stage: "active", includeVoided: true });
+  eq("stage filter + voided included", [filtered.where.stage, filtered.where.voided], ["active", undefined]);
+  eq("search builds an OR across email/empId/name", filtered.where.AND.some((c) => Array.isArray(c.OR) && c.OR.length === 3), true);
+  eq("date range becomes gte/lte", [filtered.where.AND.some((c) => c.date?.gte === "2026-01-01"), filtered.where.AND.some((c) => c.date?.lte === "2026-12-31")], [true, true]);
+}
+
 console.log("\n── Password policy ──");
 {
   eq("too short rejected", !!passwordProblem("Ab1"), true);

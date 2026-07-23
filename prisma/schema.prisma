@@ -143,6 +143,8 @@ model Case {
   @@index([email, violation, date])
   @@index([stage])
   @@index([requiresAcknowledgement, agentAcknowledgedAt])
+  // Supports the paginated read API's account-scoped, date-ordered windows.
+  @@index([account, date])
 }
 
 // The editable Disciplinary Consequences Matrix. Seeded with the 35-violation
