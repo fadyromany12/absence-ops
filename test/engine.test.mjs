@@ -204,7 +204,7 @@ console.log("\n── Escalation flags ──");
 const { agentMatches, agentKeyOf } = await import(`${LIB}/identity.js`);
 const { applyCompensation } = await import(`${LIB}/compensation.js`);
 const { parseCsv, parseDur, parseRtaDate, mapHeaders, assessRta, buildEntries, TEMPLATE_CSV } = await import(`${LIB}/rta.js`);
-const { can, TABS_FOR, ROLES, DEFAULT_PASSWORD } = await import(`${LIB}/auth.js`);
+const { can, TABS_FOR, ROLES, DEFAULT_PASSWORD, passwordProblem } = await import(`${LIB}/auth.js`);
 const bcrypt = (await import("bcryptjs")).default;
 
 console.log("\n── Agent identity (empId OR email) ──");
@@ -324,6 +324,16 @@ console.log("\n── RBAC + password hashing ──");
 
   const hash = bcrypt.hashSync(DEFAULT_PASSWORD, 10);
   eq("bcrypt roundtrip", [bcrypt.compareSync(DEFAULT_PASSWORD, hash), bcrypt.compareSync("nope", hash)], [true, false]);
+}
+
+console.log("\n── Password policy ──");
+{
+  eq("too short rejected", !!passwordProblem("Ab1"), true);
+  eq("missing uppercase rejected", !!passwordProblem("abcdefg1"), true);
+  eq("missing lowercase rejected", !!passwordProblem("ABCDEFG1"), true);
+  eq("missing digit rejected", !!passwordProblem("Abcdefgh"), true);
+  eq("the default is rejected", !!passwordProblem(DEFAULT_PASSWORD), true);
+  eq("a strong password passes", passwordProblem("Petrol#2026"), null);
 }
 
 console.log("\n── Login rate limiting ──");
