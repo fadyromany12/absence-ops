@@ -8,6 +8,34 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/passwords";
 import { loginLimiter } from "@/lib/rate-limit.js";
 
+// Authentication audit. Best-effort: a logging failure must never block a
+// login, so every write is wrapped. actorId links to the user on success.
+async function auditLogin(
+  action: "LOGIN_SUCCEEDED" | "LOGIN_FAILED" | "LOGIN_BLOCKED",
+  email: string,
+  extra: { actorId?: string; role?: string; reason?: string } = {}
+) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        actorId: extra.actorId ?? null,
+        actorName: email || "unknown",
+        actorRole: extra.role ?? "Anonymous",
+        action,
+        summary:
+          action === "LOGIN_SUCCEEDED"
+            ? `Signed in: ${email}`
+            : action === "LOGIN_BLOCKED"
+              ? `Login blocked (rate limited): ${email}`
+              : `Failed login: ${email}`,
+        meta: extra.reason ? { reason: extra.reason } : {},
+      },
+    });
+  } catch {
+    /* audit is best-effort — never break auth on a logging error */
+  }
+}
+
 declare module "next-auth" {
   interface Session {
     user: {
@@ -38,14 +66,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Throttle before touching the DB — a locked-out identifier costs no
         // bcrypt work and no query. Keyed by email; a success clears the count.
-        if (loginLimiter.status(email).blocked) return null;
+        if (loginLimiter.status(email).blocked) {
+          await auditLogin("LOGIN_BLOCKED", email, { reason: "rate_limited" });
+          return null;
+        }
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.active || !verifyPassword(password, user.passHash)) {
           loginLimiter.fail(email);
+          await auditLogin("LOGIN_FAILED", email, {
+            reason: !user ? "no_such_user" : !user.active ? "inactive" : "bad_password",
+          });
           return null;
         }
         loginLimiter.succeed(email);
+        await auditLogin("LOGIN_SUCCEEDED", email, { actorId: user.id, role: user.role });
         return {
           id: user.id,
           name: user.name,

@@ -7,7 +7,7 @@
    text search. Nothing here mutates — the API has no write surface for it. */
 
 import { useEffect, useMemo, useState } from "react";
-import { ScrollText, Search, RefreshCw, Signature, Gavel, UploadCloud, UserCog, KeyRound, Settings2, Table2, Trash2, ClipboardPlus, Pencil, Bomb } from "lucide-react";
+import { ScrollText, Search, RefreshCw, Signature, Gavel, UploadCloud, UserCog, KeyRound, Settings2, Table2, Trash2, ClipboardPlus, Pencil, Bomb, LogIn, ShieldAlert, Ban, Archive } from "lucide-react";
 import { Card, Pill, Muted, BtnGhost } from "./ui/index.jsx";
 import { P } from "../lib/tokens.js";
 import { fmtStamp, plural } from "../lib/format.js";
@@ -19,6 +19,7 @@ const ACTIONS = {
   CASE_DECIDED: { label: "Decided", color: P.amber, icon: Gavel },
   CASE_UPDATED: { label: "Updated", color: P.sub, icon: Pencil },
   CASE_DELETED: { label: "Deleted", color: P.brick, icon: Trash2 },
+  CASE_VOIDED: { label: "Voided", color: "#6B7280", icon: Archive },
   CASE_ACKNOWLEDGED: { label: "Signed", color: "#A78BFA", icon: Signature },
   RTA_IMPORTED: { label: "RTA import", color: P.petrol, icon: UploadCloud },
   DCM_UPDATED: { label: "Matrix", color: P.amber, icon: Table2 },
@@ -28,6 +29,9 @@ const ACTIONS = {
   USER_DELETED: { label: "User −", color: P.brick, icon: UserCog },
   USER_PASSWORD_CHANGED: { label: "Password", color: P.sub, icon: KeyRound },
   FACTORY_RESET: { label: "Reset", color: P.brick, icon: Bomb },
+  LOGIN_SUCCEEDED: { label: "Login", color: P.green, icon: LogIn },
+  LOGIN_FAILED: { label: "Login ✗", color: P.amber, icon: ShieldAlert },
+  LOGIN_BLOCKED: { label: "Blocked", color: P.brick, icon: Ban },
 };
 
 export default function AuditTrail() {
