@@ -68,6 +68,7 @@ export default async function AgentPortalPage() {
           severity: (e.severity as string) ?? null,
           deductionApplied: (e.deductionApplied as number) || 0,
           investigation: e.severity === "Serious" || e.severity === "Zero Tolerance",
+          appealState: (e.appealState as string) || "",
         }))}
       />
 

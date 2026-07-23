@@ -80,6 +80,7 @@ export default function Workspace({ initial, me }) {
     deleteEntry,
     restoreEntry,
     purgeEntry,
+    resolveAppeal,
     decide,
     loadSamples,
     setDcm,
@@ -152,6 +153,7 @@ export default function Workspace({ initial, me }) {
     () => scopedLive.filter((e) => e.stage === "active" && e.hrNeeded && !e.hrConfirmed && e.opsConfirmed),
     [scopedLive]
   );
+  const pendingAppeals = useMemo(() => scopedLive.filter((e) => e.appealState === "pending"), [scopedLive]);
 
   // Hours were lost whether or not a manager has ruled, so triage-stage cases
   // count. Deductions are only scheduled once a case is escalated.
@@ -411,7 +413,7 @@ export default function Workspace({ initial, me }) {
                     <div className="grid gap-2">
                       {visibleLog.length === 0 && <Muted>Nothing matches these filters.</Muted>}
                       {visibleLog.slice(0, logLimit).map((e) => (
-                        <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} onRestore={restoreEntry} onPurge={purgeEntry} />
+                        <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} onRestore={restoreEntry} onPurge={purgeEntry} onResolveAppeal={resolveAppeal} />
                       ))}
                     </div>
 
@@ -465,6 +467,17 @@ export default function Workspace({ initial, me }) {
                   me={me}
                   onPatch={patchEntry}
                   onDelete={deleteEntry}
+                />
+                <Queue
+                  title="Appeals queue"
+                  hint="Agents who have contested a finalized case. Uphold the original decision, or overturn it — overturning dismisses the case so it stops counting."
+                  rows={pendingAppeals}
+                  tone={P.amber}
+                  tls={data.tls}
+                  me={me}
+                  onPatch={patchEntry}
+                  onDelete={deleteEntry}
+                  onResolveAppeal={resolveAppeal}
                 />
               </div>
             )}
@@ -634,7 +647,7 @@ function KPI({ label, value, icon: Icon, tone, onClick }) {
   );
 }
 
-function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete }) {
+function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete, onResolveAppeal }) {
   return (
     <div>
       <SectionTitle count={rows.length} tone={tone}>
@@ -651,7 +664,7 @@ function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete }) {
       ) : (
         <div className="grid gap-2">
           {rows.map((e) => (
-            <EntryCard key={e.id} e={e} tls={tls} me={me} onPatch={onPatch} onDelete={onDelete} />
+            <EntryCard key={e.id} e={e} tls={tls} me={me} onPatch={onPatch} onDelete={onDelete} onResolveAppeal={onResolveAppeal} />
           ))}
         </div>
       )}

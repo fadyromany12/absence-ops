@@ -10,7 +10,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Signature, ShieldAlert, FileWarning, ChevronRight, FileText } from "lucide-react";
+import { Signature, ShieldAlert, FileWarning, ChevronRight, FileText, Gavel } from "lucide-react";
 import { GlassCard, GlassModal, GlassButton, GlassInput, GlassLabel, GlassBadge } from "@/components/glass";
 
 export type PendingAck = {
@@ -22,6 +22,7 @@ export type PendingAck = {
   severity: string | null;
   deductionApplied: number;
   investigation: boolean;
+  appealState: string;
 };
 
 const SEV_TONE: Record<string, "neutral" | "amber" | "rose" | "violet"> = {
@@ -40,6 +41,9 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
   const [signature, setSignature] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [appealOpen, setAppealOpen] = useState(false);
+  const [appealReason, setAppealReason] = useState("");
+  const [appealState, setAppealState] = useState("");
 
   if (!pending.length) return null;
 
@@ -48,6 +52,26 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
     setAccepted(false);
     setSignature("");
     setError("");
+    setAppealOpen(false);
+    setAppealReason("");
+    setAppealState(c.appealState || "");
+  };
+
+  const submitAppeal = async () => {
+    if (!active || appealReason.trim().length < 10) return;
+    setBusy(true);
+    setError("");
+    const res = await fetch("/api/cases/appeal", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ caseId: active.id, reason: appealReason.trim() }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setError(body.error || "Could not submit the appeal.");
+    setAppealState("pending");
+    setAppealOpen(false);
+    router.refresh();
   };
 
   const close = () => {
@@ -163,6 +187,46 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
               <FileText size={14} />
               Download the formal warning letter (PDF)
             </a>
+
+            {/* Right to contest */}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5">
+              {appealState === "pending" ? (
+                <p className="inline-flex items-center gap-2 text-[12.5px] text-amber-300">
+                  <Gavel size={14} /> Your appeal is under review by HR.
+                </p>
+              ) : appealState ? (
+                <p className="inline-flex items-center gap-2 text-[12.5px] text-slate-300">
+                  <Gavel size={14} /> Appeal {appealState === "overturned" ? "granted — this case was overturned" : "reviewed — the decision stands"}.
+                </p>
+              ) : appealOpen ? (
+                <div className="grid gap-2">
+                  <GlassLabel>Why are you contesting this decision?</GlassLabel>
+                  <textarea
+                    value={appealReason}
+                    onChange={(e) => setAppealReason(e.target.value)}
+                    rows={3}
+                    placeholder="Explain what you believe is incorrect (at least 10 characters)…"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 p-2.5 text-[13px] text-slate-100 outline-none focus:border-amber-400/40"
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <GlassButton type="button" variant="ghost" onClick={() => setAppealOpen(false)} disabled={busy}>
+                      Cancel
+                    </GlassButton>
+                    <GlassButton type="button" variant="primary" onClick={submitAppeal} loading={busy} disabled={appealReason.trim().length < 10}>
+                      <Gavel size={14} /> Submit appeal
+                    </GlassButton>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAppealOpen(true)}
+                  className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-amber-300 hover:text-amber-200"
+                >
+                  <Gavel size={14} /> I disagree — appeal this decision
+                </button>
+              )}
+            </div>
 
             {/* The statement + signature */}
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3.5">

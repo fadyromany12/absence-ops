@@ -3,7 +3,7 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw, Timer, FileText } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw, Timer, FileText, Gavel } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
@@ -25,10 +25,12 @@ const ACTION_LABEL = {
   restored: "Restored",
 };
 
-export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onRestore, onPurge, selectable, selected, onSelect }) {
+export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onRestore, onPurge, onResolveAppeal, selectable, selected, onSelect }) {
   const [showHistory, setShowHistory] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [hrRef, setHrRef] = useState(e.hrRef || "");
+  const [appealNote, setAppealNote] = useState("");
+  const canRuleAppeal = onResolveAppeal && (can(me, "hr") || can(me, "triage"));
 
   const st = statusOf(e);
   const sev = e.severity ? sevColor(e.severity) : P.green;
@@ -229,6 +231,40 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
             <div className="ao-mono mt-1" style={{ fontSize: 11, color: P.sub }}>
               Restorable at any time · not counted while voided
             </div>
+          </div>
+        )}
+
+        {e.appealState === "pending" && !voided && (
+          <div className="mt-2 p-2.5" style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${P.amber}55`, borderRadius: 8 }}>
+            <div className="flex items-center gap-2">
+              <Gavel size={13} color={P.amber} style={{ flexShrink: 0 }} />
+              <span className="ao-disp uppercase tracking-wide font-semibold" style={{ fontSize: 11.5, color: P.amber }}>
+                Appeal pending
+              </span>
+            </div>
+            <div className="mt-1" style={{ fontSize: 12.5, color: P.inkSoft }}>“{e.appealReason}”</div>
+            {canRuleAppeal && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <TInput
+                  placeholder="Decision note (optional)…"
+                  value={appealNote}
+                  onChange={(ev) => setAppealNote(ev.target.value)}
+                  style={{ flex: 1, minWidth: 160, fontSize: 12.5, padding: "5px 8px" }}
+                />
+                <BtnGhost onClick={() => onResolveAppeal(e.id, "upheld", appealNote.trim())}>Uphold</BtnGhost>
+                <BtnPrimary bg={P.green} onClick={() => onResolveAppeal(e.id, "overturned", appealNote.trim())}>
+                  Overturn
+                </BtnPrimary>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(e.appealState === "upheld" || e.appealState === "overturned") && (
+          <div className="mt-2 inline-flex items-center gap-1.5" style={{ fontSize: 12, color: e.appealState === "overturned" ? P.green : P.sub }}>
+            <Gavel size={12} />
+            Appeal {e.appealState === "overturned" ? "granted — overturned" : "reviewed — upheld"}
+            {e.appealNote ? ` · ${e.appealNote}` : ""}
           </div>
         )}
 

@@ -118,6 +118,16 @@ model Case {
   // System-of-record events additionally land in AuditLog.
   activity Json @default("[]")
 
+  // ── Appeal / right to contest ────────────────────────────────────────────
+  // The agent may contest a finalized disciplinary case once. appealState is
+  // "" | pending | upheld | overturned. Overturning dismisses the case (it stops
+  // counting); upholding leaves it intact. All transitions are audited.
+  appealState      String    @default("")
+  appealReason     String    @default("")
+  appealAt         DateTime?
+  appealNote       String    @default("") // the resolver's decision note
+  appealResolvedAt DateTime?
+
   // ── Digital acknowledgement ──────────────────────────────────────────────
   // Set true when HR/OPS finalizes a disciplinary case; the agent portal
   // surfaces it until the agent signs. agentAcknowledgedAt is the stamp —
@@ -178,7 +188,7 @@ model AuditLog {
   actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorName String
   actorRole String
-  action    String // CASE_CREATED | CASE_DECIDED | CASE_UPDATED | CASE_DELETED | CASE_VOIDED | CASE_ACKNOWLEDGED | RTA_IMPORTED | DCM_UPDATED | CONFIG_UPDATED | USER_CREATED | USER_UPDATED | USER_DELETED | USER_PASSWORD_CHANGED | FACTORY_RESET | LOGIN_SUCCEEDED | LOGIN_FAILED | LOGIN_BLOCKED
+  action    String // CASE_CREATED | CASE_DECIDED | CASE_UPDATED | CASE_DELETED | CASE_VOIDED | CASE_ACKNOWLEDGED | APPEAL_SUBMITTED | APPEAL_RESOLVED | RTA_IMPORTED | DCM_UPDATED | CONFIG_UPDATED | USER_CREATED | USER_UPDATED | USER_DELETED | USER_PASSWORD_CHANGED | FACTORY_RESET | LOGIN_SUCCEEDED | LOGIN_FAILED | LOGIN_BLOCKED
   caseId    String?
   summary   String
   meta      Json     @default("{}")

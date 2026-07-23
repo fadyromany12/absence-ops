@@ -82,6 +82,11 @@ export function useServerData(initial) {
         setEntries(r.entries);
         toast("Case permanently deleted.");
       }, swallow),
+    resolveAppeal: (caseId, decision, note) =>
+      call("/api/cases/appeal/resolve", "POST", { caseId, decision, note }).then((r) => {
+        setEntries(r.entries);
+        toast(decision === "overturned" ? "Appeal granted — case overturned & dismissed." : "Appeal reviewed — original decision upheld.");
+      }, swallow),
     decide: (ids, stage, assignee, comment) =>
       call("/api/entries/decide", "POST", { ids, stage, assignee, comment }).then((r) => {
         setEntries(r.entries);

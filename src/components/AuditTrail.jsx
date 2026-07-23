@@ -7,7 +7,7 @@
    text search. Nothing here mutates — the API has no write surface for it. */
 
 import { useEffect, useMemo, useState } from "react";
-import { ScrollText, Search, RefreshCw, Signature, Gavel, UploadCloud, UserCog, KeyRound, Settings2, Table2, Trash2, ClipboardPlus, Pencil, Bomb, LogIn, ShieldAlert, Ban, Archive } from "lucide-react";
+import { ScrollText, Search, RefreshCw, Signature, Gavel, UploadCloud, UserCog, KeyRound, Settings2, Table2, Trash2, ClipboardPlus, Pencil, Bomb, LogIn, ShieldAlert, Ban, Archive, Scale } from "lucide-react";
 import { Card, Pill, Muted, BtnGhost } from "./ui/index.jsx";
 import { P } from "../lib/tokens.js";
 import { fmtStamp, plural } from "../lib/format.js";
@@ -32,6 +32,8 @@ const ACTIONS = {
   LOGIN_SUCCEEDED: { label: "Login", color: P.green, icon: LogIn },
   LOGIN_FAILED: { label: "Login ✗", color: P.amber, icon: ShieldAlert },
   LOGIN_BLOCKED: { label: "Blocked", color: P.brick, icon: Ban },
+  APPEAL_SUBMITTED: { label: "Appeal", color: P.amber, icon: Gavel },
+  APPEAL_RESOLVED: { label: "Appeal ✓", color: P.petrol, icon: Scale },
 };
 
 export default function AuditTrail() {

@@ -19,6 +19,8 @@ export function toEntry(row: Case): Entry {
     severity: row.severity ?? null,
     occurrence: row.occurrence ?? null,
     activity: Array.isArray(row.activity) ? row.activity : [],
+    appealAt: row.appealAt ? row.appealAt.getTime() : null,
+    appealResolvedAt: row.appealResolvedAt ? row.appealResolvedAt.getTime() : null,
     agentAcknowledgedAt: row.agentAcknowledgedAt ? row.agentAcknowledgedAt.getTime() : null,
     createdAt: row.createdAt.getTime(),
     // Exposed as an optimistic-concurrency token: the client echoes it back on a
