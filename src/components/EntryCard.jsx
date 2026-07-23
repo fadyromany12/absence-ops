@@ -3,13 +3,13 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw, Timer } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
 import { fmtMin, fmtDate, fmtStamp, days } from "../lib/format.js";
 import { todayStr } from "../lib/dates.js";
-import { statusOf } from "../lib/engine.js";
+import { statusOf, slaFor } from "../lib/engine.js";
 import { PER_MONTH_CAP } from "../lib/constants.js";
 import { can } from "../lib/auth.js";
 
@@ -34,6 +34,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
   const sev = e.severity ? sevColor(e.severity) : P.green;
   const voided = !!e.voided;
   const dimmed = e.stage === "dismissed" || voided;
+  const sla = slaFor(e);
   const capped = (e.deductionDays || 0) > (e.deductionApplied || 0);
 
   const log = (type, text, by = "") => ({ at: Date.now(), by, type, text });
@@ -112,6 +113,23 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
             </span>
           )}
           <span className="flex-1" />
+          {sla && (
+            <span
+              className="ao-mono inline-flex items-center gap-1"
+              title={`Waiting ${sla.ageDays} day${sla.ageDays === 1 ? "" : "s"} ${sla.label} · SLA target ${sla.limit}d`}
+              style={{
+                fontSize: 10.5,
+                padding: "1px 6px",
+                borderRadius: 999,
+                color: sla.breached ? "#fff" : sla.warn ? P.amber : P.sub,
+                background: sla.breached ? P.brick : "transparent",
+                border: `1px solid ${sla.breached ? P.brick : sla.warn ? P.amber : P.line}`,
+              }}
+            >
+              <Timer size={10} />
+              {sla.ageDays}d {sla.label}
+            </span>
+          )}
           <Pill color={STATUS_COLOR[st]} filled={st !== "Closed" && st !== "Dismissed"}>
             {st}
           </Pill>

@@ -1,6 +1,6 @@
 /* Exercising the rules engine against the spec's stated behaviours. */
 const LIB = "../src/lib";
-const { verdictFor, occurrenceFor, emergencyUsage, computeEscalations, countsForDiscipline, statusOf } = await import(`${LIB}/engine.js`);
+const { verdictFor, occurrenceFor, emergencyUsage, computeEscalations, countsForDiscipline, statusOf, slaFor } = await import(`${LIB}/engine.js`);
 const { applyLaborLawCap, settleDeductions, deductionDaysOf } = await import(`${LIB}/deductions.js`);
 const { DEFAULT_DCM } = await import(`${LIB}/dcm.js`);
 const { addDays, todayStr, daysBetween, consecutiveRun } = await import(`${LIB}/dates.js`);
@@ -145,6 +145,19 @@ console.log("\n── Soft delete (void) ──");
   // Voided cases raise no systemic escalation flag.
   const flags = computeEscalations([mk({ date: D(5), violation: "NCNS", voided: true }), mk({ date: D(20), violation: "NCNS", voided: true })]);
   eq("voided raises no escalation flag", flags.length, 0);
+}
+
+console.log("\n── Pipeline SLA ──");
+{
+  const now = Date.now();
+  const DAY = 86400000;
+  const fresh = mk({ stage: "review", createdAt: now });
+  eq("fresh triage case within SLA", [slaFor(fresh).label, slaFor(fresh).breached], ["in triage", false]);
+  eq("5-day-old triage case breaches SLA", slaFor(mk({ stage: "review", createdAt: now - 5 * DAY })).breached, true);
+  eq("closed case has no SLA clock", slaFor(mk({ stage: "active", notified: true, opsConfirmed: true, hrNeeded: false })), null);
+  eq("voided case has no SLA clock", slaFor(mk({ stage: "review", voided: true })), null);
+  const hrWait = mk({ stage: "active", notified: true, opsConfirmed: true, hrNeeded: true, hrConfirmed: false, createdAt: now, activity: [{ at: now - 10 * DAY, by: "x", type: "ops", text: "" }] });
+  eq("awaiting HR measured from OPS sign-off", [slaFor(hrWait).label, slaFor(hrWait).breached], ["awaiting HR", true]);
 }
 
 console.log("\n── Emergency leave (spec 3C) ──");

@@ -99,6 +99,21 @@ export function agentSummary(entries, agent, asOf = todayStr()) {
   };
 }
 
+/**
+ * Active warning chains whose 90-day reset falls within `withinDays`, across
+ * every agent — so a TL can act before a warning lapses. Sorted soonest-first.
+ */
+export function upcomingResets(entries, withinDays) {
+  const out = [];
+  for (const a of listAgents(entries)) {
+    const s = agentSummary(entries, { email: a.email, empId: a.empId });
+    for (const w of s.activeWarnings) {
+      if (w.daysLeft <= withinDays) out.push({ name: a.name, account: a.account, empId: a.empId, email: a.email, ...w });
+    }
+  }
+  return out.sort((x, y) => x.daysLeft - y.daysLeft);
+}
+
 /** Chronological case history, newest first, for the profile timeline. */
 export function agentTimeline(entries, agent, windowDays) {
   const today = todayStr();

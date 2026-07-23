@@ -4,13 +4,15 @@
    the top so a thrown-out case never inflates hours lost or the deduction pool. */
 
 import { useMemo } from "react";
-import { PhoneCall, UserX, CalendarX2, Users, TriangleAlert, Scale, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { PhoneCall, UserX, CalendarX2, Users, TriangleAlert, Scale, TrendingUp, TrendingDown, Minus, CalendarClock, Timer } from "lucide-react";
 import { Card, Pill, Muted } from "./ui/index.jsx";
 import { P, SEV_ORDER, accColor, sevColor } from "../lib/tokens.js";
 import { fmtMin, fmtDate, days } from "../lib/format.js";
-import { countsForDiscipline } from "../lib/engine.js";
+import { countsForDiscipline, slaFor } from "../lib/engine.js";
 import { todayStr, addDays, daysBetween } from "../lib/dates.js";
 import { agentKeyOf } from "../lib/identity.js";
+import { upcomingResets } from "../lib/agents.js";
+import { RESET_SOON_DAYS } from "../lib/constants.js";
 
 const FLAG_ICON = { "3in30": PhoneCall, "5in60": Users, ncns: UserX, emergency: CalendarX2 };
 
@@ -121,6 +123,18 @@ export default function Dashboard({ entries, accounts, escalations }) {
 
   // Keyed like the rest of the app — empId first, email as fallback. RTA rows
   // carry IDs but no emails; an email-only key would merge them all into one.
+  const resets = useMemo(() => upcomingResets(entries, RESET_SOON_DAYS), [entries]);
+
+  const slaBreaches = useMemo(
+    () =>
+      live
+        .map((e) => ({ e, sla: slaFor(e) }))
+        .filter((x) => x.sla && x.sla.breached)
+        .sort((a, b) => b.sla.ageDays - a.sla.ageDays)
+        .slice(0, 8),
+    [live]
+  );
+
   const offenders = useMemo(() => {
     const m = {};
     for (const e of escalated) {
@@ -185,6 +199,61 @@ export default function Dashboard({ entries, accounts, escalations }) {
           </div>
         )}
       </Card>
+
+      {/* Time-sensitive: SLA breaches and warnings about to lapse */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card
+          title="Cases past SLA"
+          right={slaBreaches.length ? <Pill color={P.brick} filled>{slaBreaches.length}</Pill> : <Pill color={P.green}>On track</Pill>}
+        >
+          {slaBreaches.length === 0 ? (
+            <Muted>Every open case is within its stage turnaround target.</Muted>
+          ) : (
+            <div className="grid gap-2">
+              {slaBreaches.map(({ e, sla }) => (
+                <div key={e.id} className="flex items-center gap-2">
+                  <Timer size={13} color={P.brick} style={{ flexShrink: 0 }} />
+                  <span className="ao-mono truncate" style={{ fontSize: 12.5, color: P.ink, flex: 1 }}>
+                    {e.agentName || e.email || e.empId}
+                  </span>
+                  <span className="truncate" style={{ fontSize: 11.5, color: P.sub, maxWidth: 130 }}>
+                    {e.violation}
+                  </span>
+                  <Pill color={P.brick} filled>
+                    {sla.ageDays}d {sla.label}
+                  </Pill>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card
+          title={`Warnings resetting within ${RESET_SOON_DAYS} days`}
+          right={resets.length ? <Pill color={P.amber} filled>{resets.length}</Pill> : <Pill color={P.sub}>None</Pill>}
+        >
+          {resets.length === 0 ? (
+            <Muted>No active warning chains lapse in the next {RESET_SOON_DAYS} days.</Muted>
+          ) : (
+            <div className="grid gap-2">
+              {resets.slice(0, 8).map((w, i) => (
+                <div key={`${w.empId || w.email}-${w.violation}-${i}`} className="flex items-center gap-2">
+                  <CalendarClock size={13} color={P.amber} style={{ flexShrink: 0 }} />
+                  <span className="truncate" style={{ fontSize: 12.5, color: P.ink, flex: 1 }}>
+                    {w.name} <span style={{ color: P.sub }}>№{w.occ}</span>
+                  </span>
+                  <span className="truncate" style={{ fontSize: 11.5, color: P.sub, maxWidth: 130 }}>
+                    {w.violation}
+                  </span>
+                  <span className="ao-mono" style={{ fontSize: 11.5, color: w.daysLeft <= 3 ? P.brick : P.amber }}>
+                    {w.daysLeft}d left
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Trend: case volume per week, last 8 weeks */}
       <Card
