@@ -326,6 +326,20 @@ console.log("\n── RBAC + password hashing ──");
   eq("bcrypt roundtrip", [bcrypt.compareSync(DEFAULT_PASSWORD, hash), bcrypt.compareSync("nope", hash)], [true, false]);
 }
 
+console.log("\n── Warning letter ──");
+{
+  const { letterModel, letterFilename } = await import(`${LIB}/letter.js`);
+  const e = mk({ violation: "NCNS", occurrence: 2, severity: "Moderate", action: "Final Warning + 5-day deduction", deductionApplied: 5, deductionDays: 5, hrRef: "HR-2026-1", account: "Beko", empId: "EG1", email: "a@x", date: "2026-07-01" });
+  const m = letterModel(e, { org: "Konecta GDC", date: "2026-07-23" });
+  eq("letter title", m.title, "Disciplinary Warning Notice");
+  eq("letter subject carries violation + occurrence", m.subject, "NCNS — occurrence №2");
+  eq("letter reports the applied deduction", m.deductionDays, 5);
+  eq("letter body names the prescribed action", m.body.some((p) => p.includes("Final Warning + 5-day deduction")), true);
+  eq("letter filename is safe", /^warning-letter-EG1-2026-07-01\.pdf$/.test(letterFilename(e)), true);
+  const ser = letterModel(mk({ violation: "Physical assault / threats", severity: "Serious", action: "Termination of Employment" }), {});
+  eq("serious case adds the response-window clause", [ser.investigation, ser.body.some((p) => p.includes("3–5 working days"))], [true, true]);
+}
+
 console.log("\n── Password policy ──");
 {
   eq("too short rejected", !!passwordProblem("Ab1"), true);

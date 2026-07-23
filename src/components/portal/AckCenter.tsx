@@ -10,7 +10,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Signature, ShieldAlert, FileWarning, ChevronRight } from "lucide-react";
+import { Signature, ShieldAlert, FileWarning, ChevronRight, FileText } from "lucide-react";
 import { GlassCard, GlassModal, GlassButton, GlassInput, GlassLabel, GlassBadge } from "@/components/glass";
 
 export type PendingAck = {
@@ -152,6 +152,17 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
                 </div>
               )}
             </div>
+
+            {/* The formal letter, for the record */}
+            <a
+              href={`/api/cases/${active.id}/letter`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-violet-300 hover:text-violet-200"
+            >
+              <FileText size={14} />
+              Download the formal warning letter (PDF)
+            </a>
 
             {/* The statement + signature */}
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3.5">

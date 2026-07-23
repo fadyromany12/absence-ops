@@ -3,7 +3,7 @@
    reached in the TL → OPS → HR pipeline. */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw, Timer } from "lucide-react";
+import { ChevronDown, ChevronUp, Trash2, Scale, MessageSquarePlus, CheckSquare, Square, Hourglass, Paperclip, RotateCcw, Timer, FileText } from "lucide-react";
 import { Pill, Toggle, TInput, BtnGhost, BtnPrimary, Label } from "./ui/index.jsx";
 import ReviewBox from "./ReviewBox.jsx";
 import { P, accColor, sevColor, STATUS_COLOR } from "../lib/tokens.js";
@@ -356,6 +356,19 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
             History ({(e.activity || []).length})
             {showHistory ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
+          {e.disciplinary && !voided && (
+            <a
+              href={`/api/cases/${e.id}/letter`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1"
+              style={{ fontSize: 12, color: P.petrol, textDecoration: "none" }}
+              title="Download the formal warning letter (PDF)"
+            >
+              <FileText size={12} />
+              Letter
+            </a>
+          )}
           <span className="flex-1" />
           {can(me, "delete") &&
             (voided ? (
