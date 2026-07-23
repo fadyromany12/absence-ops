@@ -17,6 +17,16 @@ export const PATCH = guarded(async (req: Request) => {
   const existing = before.find((e) => e.id === id);
   if (!existing) throw new GuardError(404, "Case not found.");
 
+  // Optimistic concurrency: the version token is the millisecond updatedAt the
+  // API hands out. If the client echoes one back and the case has since been
+  // written by someone else, refuse rather than clobber. Callers that omit it
+  // (or send a non-numeric value) are not gated.
+  const clientVer = typeof entry.updatedAt === "number" ? entry.updatedAt : null;
+  const dbVer = typeof existing.updatedAt === "number" ? existing.updatedAt : null;
+  if (clientVer != null && dbVer != null && clientVer !== dbVer) {
+    throw new GuardError(409, "This case changed since you opened it — reload and reapply your edit.");
+  }
+
   // The signature block is written only by the acknowledge endpoint —
   // whatever the client sent for it is discarded.
   const preserved = {

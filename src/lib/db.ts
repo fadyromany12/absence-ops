@@ -21,7 +21,10 @@ export function toEntry(row: Case): Entry {
     activity: Array.isArray(row.activity) ? row.activity : [],
     agentAcknowledgedAt: row.agentAcknowledgedAt ? row.agentAcknowledgedAt.getTime() : null,
     createdAt: row.createdAt.getTime(),
-    updatedAt: undefined,
+    // Exposed as an optimistic-concurrency token: the client echoes it back on a
+    // PATCH and the route rejects the write if the DB has moved on. Never written
+    // back (not in CASE_FIELDS) — Prisma's @updatedAt manages it.
+    updatedAt: row.updatedAt.getTime(),
   };
 }
 
@@ -87,7 +90,10 @@ export async function syncEntries(before: Entry[], after: Entry[]): Promise<Entr
     }),
   ]);
 
-  return settled;
+  // Re-read so callers (and the client) get DB truth — crucially the fresh
+  // updatedAt version, so a follow-up edit by the same user isn't mistaken for
+  // a stale concurrent write.
+  return loadEntries();
 }
 
 export async function writeAudit(opts: {
