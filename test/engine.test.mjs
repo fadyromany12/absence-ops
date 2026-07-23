@@ -281,6 +281,30 @@ eq("escaped quote survives", parseCsv('a,"say ""hi""",c')[0], ["a", 'say "hi"', 
   eq("both carry the escalation log entry", decided.every((e) => e.activity.some((x) => x.type === "escalated")), true);
 }
 {
+  // RTA de-duplication: a row matching a live case is flagged and not re-imported.
+  const csv = [
+    "Date,Employee Name,Employee ID,Status,Tardy,Missing Hours,Early Departure,Hours can be compenstaed",
+    `${D(2)},Sara M,EG0999,NCNS,0,9:00,0,0`,
+  ].join("\n");
+  const existing = [mk({ date: D(2), empId: "EG0999", email: "", violation: "NCNS" })];
+  const a = assessRta(csv, DEFAULT_DCM, existing);
+  eq("re-imported RTA row flagged duplicate", [a.counts.duplicate, a.rows[0].cls], [1, "duplicate"]);
+  const built = buildEntries(a.rows, { account: "Beko", entries: existing, dcm: DEFAULT_DCM, uploadedBy: "WFM" });
+  eq("duplicate is not re-imported", built.entries.length, 0);
+
+  // A voided prior frees the slot — the re-import is allowed back in.
+  const voidedExisting = [mk({ date: D(2), empId: "EG0999", email: "", violation: "NCNS", voided: true })];
+  eq("voided prior does not block re-import", assessRta(csv, DEFAULT_DCM, voidedExisting).counts.duplicate, 0);
+
+  // Two identical rows in one file: the second is the duplicate.
+  const dupFile = [
+    "Date,Employee Name,Employee ID,Status,Tardy,Missing Hours,Early Departure,Hours can be compenstaed",
+    `${D(2)},Sara M,EG0999,NCNS,0,9:00,0,0`,
+    `${D(2)},Sara M,EG0999,NCNS,0,9:00,0,0`,
+  ].join("\n");
+  eq("intra-file duplicate flagged", assessRta(dupFile, DEFAULT_DCM, []).counts.duplicate, 1);
+}
+{
   // Dismissal must not re-verdict — the provisional verdict is archived as-is.
   const { decideCases } = await import(`${LIB}/engine.js`);
   const es = [mk({ date: D(2), violation: "NCNS", stage: "review", occurrence: 1, action: "Written Warning + 3-day deduction" })];

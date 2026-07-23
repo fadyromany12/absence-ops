@@ -15,6 +15,7 @@ import { AUTO_ACK_ACTION } from "../lib/compensation.js";
 const CLS_STYLE = {
   irregular: { label: "To triage", color: P.amber, filled: true },
   compensated: { label: "Auto-ack", color: P.green, filled: true },
+  duplicate: { label: "Duplicate", color: P.petrol, filled: false },
   clean: { label: "Clean", color: P.sub, filled: false },
   error: { label: "Error", color: P.brick, filled: true },
 };
@@ -29,7 +30,7 @@ export default function RtaUploader({ data, me, onCommit }) {
   const [result, setResult] = useState(null);
   const inputRef = useRef(null);
 
-  const assessed = useMemo(() => (text ? assessRta(text, data.dcm) : null), [text, data.dcm]);
+  const assessed = useMemo(() => (text ? assessRta(text, data.dcm, data.entries) : null), [text, data.dcm, data.entries]);
 
   const readFile = async (file) => {
     if (!file) return;
@@ -53,7 +54,13 @@ export default function RtaUploader({ data, me, onCommit }) {
       uploadedBy: me.name,
     });
     onCommit(entries);
-    setResult({ toTriage, acked, skipped: assessed.counts.clean || 0, errors: assessed.counts.error || 0 });
+    setResult({
+      toTriage,
+      acked,
+      skipped: assessed.counts.clean || 0,
+      duplicates: assessed.counts.duplicate || 0,
+      errors: assessed.counts.error || 0,
+    });
     setText("");
     setFileName("");
     setPasteDraft("");
@@ -187,6 +194,7 @@ export default function RtaUploader({ data, me, onCommit }) {
             <span style={{ fontSize: 12.5, color: P.inkSoft }}>
               Committed: <b>{plural(result.toTriage, "case")}</b> to the triage gate, <b>{result.acked}</b> auto-acknowledged
               (fully compensated), {result.skipped} clean row{result.skipped === 1 ? "" : "s"} skipped
+              {result.duplicates ? `, ${plural(result.duplicates, "duplicate")} skipped` : ""}
               {result.errors ? `, ${plural(result.errors, "unreadable row")} ignored` : ""}.
             </span>
           </div>
