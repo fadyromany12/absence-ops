@@ -12,6 +12,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Signature, ShieldAlert, FileWarning, ChevronRight, FileText, Gavel } from "lucide-react";
 import { GlassCard, GlassModal, GlassButton, GlassInput, GlassLabel, GlassBadge } from "@/components/glass";
+import { t } from "@/lib/i18n.js";
 
 export type PendingAck = {
   id: string;
@@ -34,7 +35,7 @@ const SEV_TONE: Record<string, "neutral" | "amber" | "rose" | "violet"> = {
 
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
 
-export default function AckCenter({ pending }: { pending: PendingAck[] }) {
+export default function AckCenter({ pending, locale = "en" }: { pending: PendingAck[]; locale?: string }) {
   const router = useRouter();
   const [active, setActive] = useState<PendingAck | null>(null);
   const [accepted, setAccepted] = useState(false);
@@ -110,12 +111,9 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-[13px] font-bold uppercase tracking-wider text-violet-200">
-              Pending acknowledgements — {pending.length}
+              {t(locale, "portal.pendingAcks")} — {pending.length}
             </h2>
-            <p className="text-[12.5px] text-slate-400">
-              HR has finalized disciplinary action{pending.length === 1 ? "" : "s"} on your file. Review and sign each
-              one — this replaces the paper acknowledgement form.
-            </p>
+            <p className="text-[12.5px] text-slate-400">{t(locale, "portal.pendingBlurb")}</p>
           </div>
         </div>
 
@@ -135,7 +133,7 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
               {c.severity && <GlassBadge tone={SEV_TONE[c.severity] || "neutral"}>{c.severity}</GlassBadge>}
               <span className="flex-1" />
               <span className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wide text-violet-300">
-                Review &amp; sign <ChevronRight size={13} />
+                {t(locale, "portal.reviewSign")} <ChevronRight size={13} className="rtl:rotate-180" />
               </span>
             </button>
           ))}
@@ -185,14 +183,14 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
               className="inline-flex items-center gap-2 text-[12.5px] font-semibold text-violet-300 hover:text-violet-200"
             >
               <FileText size={14} />
-              Download the formal warning letter (PDF)
+              {t(locale, "portal.downloadLetter")}
             </a>
 
             {/* Right to contest */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-3.5">
               {appealState === "pending" ? (
                 <p className="inline-flex items-center gap-2 text-[12.5px] text-amber-300">
-                  <Gavel size={14} /> Your appeal is under review by HR.
+                  <Gavel size={14} /> {t(locale, "portal.appealPending")}
                 </p>
               ) : appealState ? (
                 <p className="inline-flex items-center gap-2 text-[12.5px] text-slate-300">
@@ -200,7 +198,7 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
                 </p>
               ) : appealOpen ? (
                 <div className="grid gap-2">
-                  <GlassLabel>Why are you contesting this decision?</GlassLabel>
+                  <GlassLabel>{t(locale, "portal.appealPrompt")}</GlassLabel>
                   <textarea
                     value={appealReason}
                     onChange={(e) => setAppealReason(e.target.value)}
@@ -213,7 +211,7 @@ export default function AckCenter({ pending }: { pending: PendingAck[] }) {
                       Cancel
                     </GlassButton>
                     <GlassButton type="button" variant="primary" onClick={submitAppeal} loading={busy} disabled={appealReason.trim().length < 10}>
-                      <Gavel size={14} /> Submit appeal
+                      <Gavel size={14} /> {t(locale, "portal.appealSubmit")}
                     </GlassButton>
                   </div>
                 </div>
