@@ -332,7 +332,7 @@ console.log("\n── Warning letter ──");
   const e = mk({ violation: "NCNS", occurrence: 2, severity: "Moderate", action: "Final Warning + 5-day deduction", deductionApplied: 5, deductionDays: 5, hrRef: "HR-2026-1", account: "Beko", empId: "EG1", email: "a@x", date: "2026-07-01" });
   const m = letterModel(e, { org: "Konecta GDC", date: "2026-07-23" });
   eq("letter title", m.title, "Disciplinary Warning Notice");
-  eq("letter subject carries violation + occurrence", m.subject, "NCNS — occurrence №2");
+  eq("letter subject carries violation + occurrence", m.subject, "NCNS — occurrence No. 2");
   eq("letter reports the applied deduction", m.deductionDays, 5);
   eq("letter body names the prescribed action", m.body.some((p) => p.includes("Final Warning + 5-day deduction")), true);
   eq("letter filename is safe", /^warning-letter-EG1-2026-07-01\.pdf$/.test(letterFilename(e)), true);
