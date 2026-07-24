@@ -636,7 +636,7 @@ function KPI({ label, value, icon: Icon, tone, onClick }) {
     >
       <div className="flex items-center gap-2">
         <Icon size={13} color={tone || P.sub} />
-        <div className="ao-mono font-semibold" style={{ fontSize: 22, color: tone || P.ink, lineHeight: 1 }}>
+        <div className="ao-mono font-semibold ao-fluid-num" style={{ color: tone || P.ink }}>
           {value}
         </div>
       </div>

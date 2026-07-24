@@ -115,28 +115,28 @@ export const BtnGhost = ({ children, onClick, color, disabled, title, icon: Icon
 );
 
 export const Card = ({ title, children, right, accent }) => (
-  <div className="p-4 ao-glass" style={{ background: P.card, border: `1px solid ${accent || P.line}`, borderRadius: 12 }}>
+  <section className="p-4 ao-glass" style={{ background: P.card, border: `1px solid ${accent || P.line}`, borderRadius: 12 }}>
     {(title || right) && (
       <div className="flex items-center justify-between gap-2">
-        <div className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 13, color: P.sub }}>
+        <h2 className="ao-disp font-bold uppercase tracking-wide" style={{ fontSize: 13, color: P.sub }}>
           {title}
-        </div>
+        </h2>
         {right}
       </div>
     )}
     <div className={title || right ? "mt-3" : ""}>{children}</div>
-  </div>
+  </section>
 );
 
 export const SectionTitle = ({ children, count, tone }) => (
-  <div className="ao-disp font-bold uppercase tracking-wide mb-2 flex items-center gap-2" style={{ fontSize: 14, color: P.ink }}>
+  <h2 className="ao-disp font-bold uppercase tracking-wide mb-2 flex items-center gap-2" style={{ fontSize: 14, color: P.ink }}>
     {children}
     {count !== undefined && (
       <span className="ao-mono" style={{ color: tone || P.petrol }}>
         ({count})
       </span>
     )}
-  </div>
+  </h2>
 );
 
 export const Muted = ({ children }) => <div style={{ fontSize: 13, color: P.sub }}>{children}</div>;

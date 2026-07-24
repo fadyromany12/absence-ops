@@ -84,7 +84,7 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
   };
 
   return (
-    <div
+    <article
       className="flex ao-glass"
       style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 8, overflow: "hidden", opacity: dimmed ? 0.7 : 1 }}
     >
@@ -473,6 +473,6 @@ export default function EntryCard({ e, tls, me, onPatch, onDelete, onDecide, onR
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 }

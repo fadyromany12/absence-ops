@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/* ── Design tokens ────────────────────────────────────────────────────────
+   One source of truth for the Signal palette and a fluid type scale. The
+   staff views still read colours from lib/tokens.js (inline styles); these
+   custom properties back the CSS-driven surfaces and the fluid headings, so
+   the identity is variable-driven and dark-mode native. */
+:root {
+  --signal: #8b5cf6;
+  --signal-strong: #6d28d9;
+  --signal-soft: rgba(139, 92, 246, 0.14);
+  --ink: #e2e8f0;
+  --paper: #05070c;
+
+  /* Fluid type — clamp(min, fluid, max): scales smoothly with the viewport
+     so the display figures read as premium on a wide screen without breaking
+     small ones. */
+  --fluid-hero: clamp(1.6rem, 1.15rem + 1.9vw, 2.4rem);
+  --fluid-num: clamp(1.35rem, 1.1rem + 0.9vw, 1.9rem);
+  --fluid-title: clamp(1rem, 0.92rem + 0.4vw, 1.25rem);
+}
+
+.ao-fluid-hero { font-size: var(--fluid-hero); line-height: 1.05; }
+.ao-fluid-num { font-size: var(--fluid-num); line-height: 1; }
+.ao-fluid-title { font-size: var(--fluid-title); }
+
 /* ── Ink & Signal ─────────────────────────────────────────────────────────
    Quorum's base: true-ink background with a single-hue violet aurora — one
    Signal color, so the glow always reads as brand. Fonts arrive as CSS
