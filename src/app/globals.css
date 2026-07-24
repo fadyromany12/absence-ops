@@ -86,6 +86,18 @@ body {
   50% { opacity: 0.55; }
 }
 
+/* Toasts arrive from the edge they live on, so success reads as an event. */
+@keyframes aoSlideIn {
+  from { opacity: 0; transform: translateX(24px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.ao-slide-in { animation: aoSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+[dir="rtl"] .ao-slide-in { animation-name: aoSlideInRtl; }
+@keyframes aoSlideInRtl {
+  from { opacity: 0; transform: translateX(-24px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
 .ao-rise { animation: aoRise 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .ao-fade { animation: aoFade 0.22s ease-out both; }
 .ao-pop { animation: aoPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -100,6 +112,80 @@ button {
     transform 0.15s ease, box-shadow 0.2s ease, opacity 0.18s ease;
 }
 button:active:not(:disabled) { transform: scale(0.97); }
+
+/* ── Dynamic interaction layer ────────────────────────────────────────────
+   Motion that carries meaning: a light sweep on primary actions, a live
+   glow on things demanding attention, staggered entrances so lists resolve
+   instead of snapping, and bars that grow to their value. */
+
+/* Sheen — a diagonal light sweep across a filled control on hover. */
+.ao-sheen { position: relative; overflow: hidden; isolation: isolate; }
+.ao-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%) skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.ao-sheen:hover::after,
+.ao-sheen:focus-visible::after { transform: translateX(120%) skewX(-18deg); }
+
+/* Signal glow — hover halo in the brand violet (or a passed --glow colour). */
+.ao-glow { --glow: rgba(139, 92, 246, 0.75); }
+.ao-glow:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 45%, transparent),
+    0 8px 26px -10px var(--glow);
+  transform: translateY(-1px);
+}
+
+/* Attention pulse — a breathing ring for counts that need a human. Set
+   --halo to tint it (defaults to the Signal violet). */
+@keyframes aoHalo {
+  0%, 100% { box-shadow: 0 0 0 0 var(--halo, rgba(139, 92, 246, 0.5)); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+.ao-halo { animation: aoHalo 2.4s ease-out infinite; }
+
+/* Staggered entrance — children resolve one after another. */
+.ao-stagger > * { animation: aoRise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.ao-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.ao-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.ao-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.ao-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.ao-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.ao-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.ao-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.ao-stagger > *:nth-child(n + 8) { animation-delay: 0.3s; }
+
+/* Meter fill — bars grow from zero to their measured width on mount. */
+@keyframes aoGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ao-grow { transform-origin: left center; animation: aoGrow 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+[dir="rtl"] .ao-grow { transform-origin: right center; }
+
+/* Count-up figures land with a soft pop when their value changes. */
+@keyframes aoTick { from { opacity: 0.35; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.ao-tick { animation: aoTick 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Nav rail — the active item grows a Signal edge instead of just recolouring. */
+.ao-nav { position: relative; }
+.ao-nav::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  border-radius: 999px;
+  background: var(--signal);
+  transform: translateY(-50%);
+  transition: height 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+[dir="rtl"] .ao-nav::before { left: auto; right: 0; }
+.ao-nav[data-active="true"]::before { height: 62%; }
+.ao-nav:hover::before { height: 38%; }
+.ao-nav[data-active="true"]:hover::before { height: 62%; }
 
 /* Native form controls (date/time pickers, dropdowns) render dark. */
 .ao-body { color-scheme: dark; }

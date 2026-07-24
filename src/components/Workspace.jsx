@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 
 import { useServerData } from "../hooks/useServerData.js";
+import { useCountUp } from "../hooks/useCountUp.js";
 import { P, accColor } from "../lib/tokens.js";
 import { BRAND } from "../lib/brand";
 import Logo from "./Logo";
@@ -225,7 +226,7 @@ export default function Workspace({ initial, me }) {
               <button
                 key={a}
                 onClick={() => setAcc(a)}
-                className="ao-disp uppercase tracking-wide font-semibold transition"
+                className="ao-disp uppercase tracking-wide font-semibold transition ao-glow"
                 style={{
                   fontSize: 12,
                   padding: "5px 12px",
@@ -234,10 +235,14 @@ export default function Workspace({ initial, me }) {
                   color: acc === a ? "#06121A" : "#C9D6D4",
                   background: acc === a ? "#E9F1F0" : "transparent",
                   border: `1px solid ${acc === a ? "#E9F1F0" : "#3A4155"}`,
+                  "--glow": a === "All" ? "rgba(139,92,246,0.6)" : `${accColor(a)}aa`,
                 }}
               >
                 {a !== "All" && (
-                  <span style={{ width: 7, height: 7, borderRadius: 999, background: accColor(a), display: "inline-block", marginRight: 6 }} />
+                  <span
+                    className={acc === a ? "ao-pulse" : ""}
+                    style={{ width: 7, height: 7, borderRadius: 999, background: accColor(a), display: "inline-block", marginRight: 6 }}
+                  />
                 )}
                 {a}
               </button>
@@ -310,7 +315,7 @@ export default function Workspace({ initial, me }) {
           {me.role !== "WFM" && (
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
               <KPI label="Disciplinary cases" value={disciplinaryCount} icon={ShieldAlert} tone={disciplinaryCount ? P.brick : P.green} />
-              <KPI label="Total hours lost" value={fmtMin(hoursLost)} icon={Clock3} tone={hoursLost ? P.brick : P.green} />
+              <KPI label="Total hours lost" value={hoursLost} format={(n) => fmtMin(Math.round(n))} icon={Clock3} tone={hoursLost ? P.brick : P.green} />
               <KPI
                 label="Pending triage review"
                 value={pendingReview.length}
@@ -325,7 +330,7 @@ export default function Workspace({ initial, me }) {
                 tone={activeEscalations ? P.amber : P.green}
                 onClick={allowedTabs.includes("approvals") ? () => setTab("approvals") : undefined}
               />
-              <KPI label="Deduction pool" value={`${deductionPool}d`} icon={Scale} tone={deductionPool ? P.ink : P.green} />
+              <KPI label="Deduction pool" value={deductionPool} format={(n) => `${Math.round(n)}d`} icon={Scale} tone={deductionPool ? P.ink : P.green} />
             </div>
           )}
 
@@ -410,7 +415,7 @@ export default function Workspace({ initial, me }) {
                       </span>
                     </div>
 
-                    <div className="grid gap-2">
+                    <div className="grid gap-2 ao-stagger">
                       {visibleLog.length === 0 && <Muted>Nothing matches these filters.</Muted>}
                       {visibleLog.slice(0, logLimit).map((e) => (
                         <EntryCard key={e.id} e={e} tls={data.tls} me={me} onPatch={patchEntry} onDelete={deleteEntry} onDecide={decideOne} onRestore={restoreEntry} onPurge={purgeEntry} onResolveAppeal={resolveAppeal} />
@@ -516,7 +521,7 @@ export default function Workspace({ initial, me }) {
       {/* Success toast — bottom right, self-dismissing */}
       {notice && (
         <div
-          className="ao-pop ao-glass fixed bottom-5 right-5 z-50 flex items-center gap-2.5"
+          className="ao-slide-in ao-glass fixed bottom-5 right-5 z-50 flex items-center gap-2.5"
           style={{
             background: "rgba(10,24,22,0.85)",
             border: `1px solid ${P.green}55`,
@@ -572,7 +577,8 @@ function NavItem({ item, active, badge, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="ao-disp uppercase tracking-wide font-semibold flex items-center gap-2 transition"
+      data-active={active ? "true" : "false"}
+      className="ao-disp ao-nav uppercase tracking-wide font-semibold flex items-center gap-2 transition group"
       style={{
         fontSize: 12.5,
         padding: "9px 12px",
@@ -585,10 +591,19 @@ function NavItem({ item, active, badge, onClick }) {
         color: active ? P.ink : P.sub,
       }}
     >
-      <Icon size={15} color={active ? P.petrol : P.sub} />
-      <span className="flex-1">{item.label}</span>
+      <Icon
+        size={15}
+        color={active ? P.petrol : P.sub}
+        className="transition-transform duration-200 group-hover:scale-110"
+      />
+      <span className="flex-1 transition-transform duration-200 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5">
+        {item.label}
+      </span>
       {badge > 0 && (
-        <span className="ao-mono ao-pulse" style={{ fontSize: 10.5, background: P.brick, color: "#fff", borderRadius: 999, padding: "1px 6px" }}>
+        <span
+          className="ao-mono ao-halo"
+          style={{ fontSize: 10.5, background: P.brick, color: "#fff", borderRadius: 999, padding: "1px 6px", "--halo": "rgba(242,109,95,0.55)" }}
+        >
           {badge}
         </span>
       )}
@@ -624,20 +639,35 @@ function NavChip({ item, active, badge, onClick }) {
   );
 }
 
-function KPI({ label, value, icon: Icon, tone, onClick }) {
+/* A scorecard figure. `value` is the raw number so it can count up; `format`
+   renders it (hours, days…). Clickable cards lift, glow and nudge their icon —
+   the whole tile reads as a control, not a label. */
+function KPI({ label, value, format, icon: Icon, tone, onClick }) {
+  const n = useCountUp(value);
+  const shown = format ? format(n) : Math.round(n).toLocaleString();
   return (
     <div
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && onClick() : undefined}
-      className={onClick ? "p-3 ao-glass ao-lift gradient-hairline" : "p-3 ao-glass gradient-hairline"}
-      style={{ background: P.card, border: `1px solid ${P.line}`, borderRadius: 12, cursor: onClick ? "pointer" : "default" }}
+      className={`p-3 ao-glass gradient-hairline group ${onClick ? "ao-lift ao-glow" : ""}`}
+      style={{
+        background: P.card,
+        border: `1px solid ${P.line}`,
+        borderRadius: 12,
+        cursor: onClick ? "pointer" : "default",
+        "--glow": tone || "rgba(139,92,246,0.6)",
+      }}
     >
       <div className="flex items-center gap-2">
-        <Icon size={13} color={tone || P.sub} />
+        <Icon
+          size={13}
+          color={tone || P.sub}
+          className={onClick ? "transition-transform duration-200 group-hover:scale-125" : undefined}
+        />
         <div className="ao-mono font-semibold ao-fluid-num" style={{ color: tone || P.ink }}>
-          {value}
+          {shown}
         </div>
       </div>
       <div className="ao-disp uppercase tracking-wider font-semibold mt-1" style={{ fontSize: 10.5, color: P.sub }}>
@@ -662,7 +692,7 @@ function Queue({ title, hint, rows, tone, tls, me, onPatch, onDelete, onResolveA
           <Muted>Clear — nothing waiting here.</Muted>
         </div>
       ) : (
-        <div className="grid gap-2">
+        <div className="grid gap-2 ao-stagger">
           {rows.map((e) => (
             <EntryCard key={e.id} e={e} tls={tls} me={me} onPatch={onPatch} onDelete={onDelete} onResolveAppeal={onResolveAppeal} />
           ))}

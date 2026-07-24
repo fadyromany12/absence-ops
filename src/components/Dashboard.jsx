@@ -173,14 +173,14 @@ export default function Dashboard({ entries, accounts, escalations }) {
             HR intervention plan.
           </Muted>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ao-stagger">
             {escalations.map((x, i) => {
               const Icon = FLAG_ICON[x.kind] || TriangleAlert;
               const c = sevColor(x.level);
               return (
                 <div
                   key={i}
-                  className="flex items-start gap-2 p-2.5"
+                  className="flex items-start gap-2 p-2.5 ao-lift"
                   style={{ background: "rgba(232,165,75,0.10)", border: `1px solid ${c}33`, borderLeft: `4px solid ${c}`, borderRadius: 6 }}
                 >
                   <Icon size={15} color={c} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -288,7 +288,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
                     </span>
                   </div>
                   <div className="mt-1" style={{ background: P.mist, borderRadius: 4, height: 10, overflow: "hidden" }}>
-                    <div style={{ width: `${(p.min / maxMin) * 100}%`, height: "100%", background: accColor(p.a) }} />
+                    <div className="ao-grow" style={{ width: `${(p.min / maxMin) * 100}%`, height: "100%", background: accColor(p.a) }} />
                   </div>
                   <div className="flex gap-3 mt-1" style={{ fontSize: 11, color: P.sub }}>
                     <span>{p.count} records</span>
@@ -324,7 +324,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
                     </span>
                   </div>
                   <div className="mt-1" style={{ background: P.mist, borderRadius: 4, height: 10, overflow: "hidden" }}>
-                    <div style={{ width: `${(p.min / maxLob) * 100}%`, height: "100%", background: p.lob === "Unassigned" ? P.sub : P.petrol }} />
+                    <div className="ao-grow" style={{ width: `${(p.min / maxLob) * 100}%`, height: "100%", background: p.lob === "Unassigned" ? P.sub : P.petrol }} />
                   </div>
                   <div style={{ fontSize: 11, color: P.sub, marginTop: 2 }}>{p.count} records</div>
                 </div>
@@ -346,6 +346,7 @@ export default function Dashboard({ entries, accounts, escalations }) {
                   </div>
                   <div className="flex-1" style={{ background: P.mist, borderRadius: 4, height: 14 }}>
                     <div
+                      className="ao-grow"
                       style={{
                         width: `${(v.count / maxV) * 100}%`,
                         height: "100%",
