@@ -42,6 +42,7 @@ export const ACCOUNT_COLORS = { Hertz: "#F5A623", Lenovo: "#F87171", Beko: "#38B
 export const STATUS_COLOR = {
   "Pending review": P.petrol,
   Dismissed: "#8A9598",
+  Voided: "#6B7280",
   Open: P.sub,
   "Awaiting OPS": P.amber,
   "Awaiting HR": P.brick,

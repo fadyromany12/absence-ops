@@ -109,7 +109,7 @@ export default function ViolationPicker({ dcm, value, onChange }) {
         )}
         <input
           value={open ? q : value || ""}
-          placeholder={value ? value : "Search 35 violations or leave types…"}
+          placeholder={value ? value : `Search ${dcm.length} violations or leave types…`}
           onChange={(e) => {
             setQ(e.target.value);
             setOpen(true);
